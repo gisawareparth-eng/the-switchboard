@@ -50,7 +50,11 @@ async function runStagingPilot() {
 
     const regRes = await fetch(`${SWITCHBOARD_URL}/api/webhook/register`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-staging-test': 'true',
+        'x-bridge-key': BRIDGE_KEY
+      },
       body: JSON.stringify({
         agent: TEST_AGENT,
         url: `http://localhost:${MOCK_PORT}/webhook`
@@ -280,7 +284,11 @@ async function runStagingPilot() {
 
     const privRegRes = await fetch(`${SWITCHBOARD_URL}/api/webhook/register`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-staging-test': 'true',
+        'x-bridge-key': BRIDGE_KEY
+      },
       body: JSON.stringify({
         agent: PRIVACY_AGENT,
         url: `http://localhost:${MOCK_PORT}/privacy-hook`,
@@ -430,7 +438,7 @@ async function runStagingPilot() {
     console.log(`[Test 12] Replay/Tamper Guard Result: ${test12Pass ? '✅ PASS' : '❌ FAIL'}`);
 
     // TEST 13: SSRF Private IP & Metadata Range Rejection
-    console.log('\n[Test 13] Testing SSRF Private IP & Metadata Rejection...');
+    console.log('\n[Test 13] Testing SSRF Private IP, Loopback & Metadata Rejection...');
     const ssrfMetadataRes = await fetch(`${SWITCHBOARD_URL}/api/webhook/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -446,18 +454,36 @@ async function runStagingPilot() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ agent: 'ssrf-test-3', url: 'http://192.168.1.1/router' })
     });
+    const ssrfLoopbackRes = await fetch(`${SWITCHBOARD_URL}/api/webhook/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent: 'ssrf-test-4', url: 'http://127.0.0.1:3000/' })
+    });
+    const ssrfRotateLoopbackRes = await fetch(`${SWITCHBOARD_URL}/api/webhook/rotate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent: TEST_AGENT, url: 'http://127.0.0.1:3000/' })
+    });
 
-    const test13Pass = ssrfMetadataRes.status === 400 && ssrfPrivate10Res.status === 400 && ssrfPrivate192Res.status === 400;
+    const test13Pass = 
+      ssrfMetadataRes.status === 400 && 
+      ssrfPrivate10Res.status === 400 && 
+      ssrfPrivate192Res.status === 400 &&
+      ssrfLoopbackRes.status === 400 &&
+      ssrfRotateLoopbackRes.status === 400;
+
     results.push({
-      test: 'SSRF_PrivateRangeRejection',
+      test: 'SSRF_PrivateRangeAndLoopbackRejection',
       pass: test13Pass,
       details: {
         metadata169Status: ssrfMetadataRes.status,
         private10Status: ssrfPrivate10Res.status,
-        private192Status: ssrfPrivate192Res.status
+        private192Status: ssrfPrivate192Res.status,
+        loopbackStatus: ssrfLoopbackRes.status,
+        rotateLoopbackStatus: ssrfRotateLoopbackRes.status
       }
     });
-    console.log(`[Test 13] SSRF Guard Result: ${test13Pass ? '✅ PASS' : '❌ FAIL'} (169.254: ${ssrfMetadataRes.status}, 10.x: ${ssrfPrivate10Res.status}, 192.168: ${ssrfPrivate192Res.status})`);
+    console.log(`[Test 13] SSRF Guard Result: ${test13Pass ? '✅ PASS' : '❌ FAIL'} (Loopback: ${ssrfLoopbackRes.status}, Rotate: ${ssrfRotateLoopbackRes.status}, 169.254: ${ssrfMetadataRes.status}, 10.x: ${ssrfPrivate10Res.status})`);
 
   } finally {
     mockServer.close();

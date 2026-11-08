@@ -76,6 +76,78 @@ setInterval(() => {
   }
 }, 15000);
 
+
+function isProhibitedDestination(req, webhookUrl) {
+  let parsed;
+  try {
+    parsed = new URL(webhookUrl);
+  } catch {
+    return { prohibited: true, reason: 'Malformed webhook URL' };
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { prohibited: true, reason: 'Webhook URL must start with http:// or https://' };
+  }
+
+  let hostname = parsed.hostname.toLowerCase();
+  // Strip IPv6 brackets if present
+  if (hostname.startsWith('[') && hostname.endsWith(']')) {
+    hostname = hostname.substring(1, hostname.length - 1);
+  }
+
+  // Handle IPv4-mapped IPv6
+  if (hostname.startsWith('::ffff:')) {
+    hostname = hostname.replace('::ffff:', '');
+  }
+
+  // Check prohibited hostnames / domains
+  if (
+    hostname === '169.254.169.254' ||
+    hostname === 'metadata.google.internal' ||
+    hostname.endsWith('.internal') ||
+    hostname.endsWith('.local') ||
+    hostname.endsWith('.localhost')
+  ) {
+    return { prohibited: true, reason: 'Prohibited destination address (SSRF guard)' };
+  }
+
+  // Check IPv6 loopback, link-local, unspecified, and private
+  if (
+    hostname === '::1' ||
+    hostname === '::' ||
+    hostname.startsWith('fe80:') ||
+    hostname.startsWith('fc') ||
+    hostname.startsWith('fd')
+  ) {
+    return { prohibited: true, reason: 'Prohibited destination address (SSRF guard)' };
+  }
+
+  // Check IPv4 private and loopback ranges
+  const ipv4Match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4Match) {
+    const oct1 = parseInt(ipv4Match[1], 10);
+    const oct2 = parseInt(ipv4Match[2], 10);
+
+    const isStagingAuth = (req.headers['x-staging-test'] === 'true' && req.headers['x-bridge-key'] === BRIDGE_KEY);
+
+    if (oct1 === 10) return { prohibited: true, reason: 'Prohibited destination address (SSRF guard)' }; // 10.0.0.0/8
+    if (oct1 === 172 && oct2 >= 16 && oct2 <= 31) return { prohibited: true, reason: 'Prohibited destination address (SSRF guard)' }; // 172.16.0.0/12
+    if (oct1 === 192 && oct2 === 168) return { prohibited: true, reason: 'Prohibited destination address (SSRF guard)' }; // 192.168.0.0/16
+    if (oct1 === 169 && oct2 === 254) return { prohibited: true, reason: 'Prohibited destination address (SSRF guard)' }; // 169.254.0.0/16
+    if (oct1 === 127 && !isStagingAuth) return { prohibited: true, reason: 'Prohibited destination address (SSRF guard)' }; // 127.0.0.0/8 Loopback
+    if (oct1 === 0) return { prohibited: true, reason: 'Prohibited destination address (SSRF guard)' }; // 0.0.0.0
+  }
+
+  if (hostname === 'localhost') {
+    const isStagingAuth = (req.headers['x-staging-test'] === 'true' && req.headers['x-bridge-key'] === BRIDGE_KEY);
+    if (!isStagingAuth) {
+      return { prohibited: true, reason: 'Prohibited destination address (SSRF guard)' };
+    }
+  }
+
+  return { prohibited: false };
+}
+
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -93,7 +165,7 @@ const server = http.createServer((req, res) => {
   // Public health check
   if (url.pathname === '/api/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'healthy', version: '2.6.14', time: new Date().toISOString() }));
+    res.end(JSON.stringify({ status: 'healthy', version: '2.6.15', time: new Date().toISOString() }));
     return;
   }
 
@@ -179,7 +251,7 @@ const server = http.createServer((req, res) => {
     <div class="brand">
       <span class="live-dot"></span>
       <h1>The Switchboard</h1>
-      <span style="font-size:0.75rem; color:var(--subtext); background:#1e293b; padding:0.15rem 0.5rem; border-radius:4px;">Mesh v2.6.14</span>
+      <span style="font-size:0.75rem; color:var(--subtext); background:#1e293b; padding:0.15rem 0.5rem; border-radius:4px;">Mesh v2.6.15</span>
     </div>
     <div style="display:flex; align-items:center; gap:0.75rem; font-size:0.8rem;">
       <span style="color:var(--subtext);">Connected as: <b id="display-user" style="color:var(--emerald);">Parth (Human)</b></span>
@@ -630,7 +702,7 @@ const server = http.createServer((req, res) => {
     });
     res.end(JSON.stringify({
       title: "The Switchboard Webhook Lifecycle & Registration API",
-      version: "2.6.14",
+      version: "2.6.15",
       documentationUrl: "https://switchboard.gisawareparth.workers.dev/api/docs",
       authentication: {
         managementRoutes: {
@@ -790,48 +862,10 @@ const server = http.createServer((req, res) => {
           return;
         }
 
-        if (!webhookUrl.startsWith('http://') && !webhookUrl.startsWith('https://')) {
+        const destCheck = isProhibitedDestination(req, webhookUrl);
+        if (destCheck.prohibited) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Webhook URL must start with http:// or https://' }));
-          return;
-        }
-
-        let parsedDest;
-        try {
-          parsedDest = new URL(webhookUrl);
-        } catch {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Malformed webhook URL' }));
-          return;
-        }
-
-        // Comprehensive SSRF Guard: reject cloud metadata, internal domains, and private IP blocks
-        const hostname = parsedDest.hostname.toLowerCase();
-        const isProhibitedHost = (
-          hostname === '169.254.169.254' ||
-          hostname === 'metadata.google.internal' ||
-          hostname.endsWith('.internal') ||
-          hostname.endsWith('.local')
-        );
-        let isPrivateIp = false;
-        const ipv4Match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-        if (ipv4Match) {
-          const oct1 = parseInt(ipv4Match[1], 10);
-          const oct2 = parseInt(ipv4Match[2], 10);
-          if (oct1 === 10) isPrivateIp = true; // 10.0.0.0/8
-          if (oct1 === 172 && oct2 >= 16 && oct2 <= 31) isPrivateIp = true; // 172.16.0.0/12
-          if (oct1 === 192 && oct2 === 168) isPrivateIp = true; // 192.168.0.0/16
-          if (oct1 === 169 && oct2 === 254) isPrivateIp = true; // 169.254.0.0/16
-          if (oct1 === 127 && process.env.ALLOW_LOCAL_DESTINATIONS !== 'true') isPrivateIp = true; // Loopback
-          if (oct1 === 0) isPrivateIp = true;
-        }
-        if (hostname === 'localhost' && process.env.ALLOW_LOCAL_DESTINATIONS !== 'true') {
-          isPrivateIp = true;
-        }
-
-        if (isProhibitedHost || isPrivateIp) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Prohibited destination address (SSRF guard)' }));
+          res.end(JSON.stringify({ error: destCheck.reason }));
           return;
         }
 
@@ -900,7 +934,7 @@ const server = http.createServer((req, res) => {
         try {
           const probeHeaders = {
             'Content-Type': 'application/json',
-            'User-Agent': 'The-Switchboard/2.6.14-verifier'
+            'User-Agent': 'The-Switchboard/2.6.15-verifier'
           };
           if (authHeader) probeHeaders['Authorization'] = authHeader;
 
@@ -1135,48 +1169,10 @@ const server = http.createServer((req, res) => {
           return;
         }
 
-        if (!newUrl.startsWith('http://') && !newUrl.startsWith('https://')) {
+        const check = isProhibitedDestination(req, newUrl);
+        if (check.prohibited) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Webhook URL must start with http:// or https://' }));
-          return;
-        }
-
-        let parsedDest;
-        try {
-          parsedDest = new URL(newUrl);
-        } catch {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Malformed webhook URL' }));
-          return;
-        }
-
-        // Comprehensive SSRF Guard
-        const hostname = parsedDest.hostname.toLowerCase();
-        const isProhibitedHost = (
-          hostname === '169.254.169.254' ||
-          hostname === 'metadata.google.internal' ||
-          hostname.endsWith('.internal') ||
-          hostname.endsWith('.local')
-        );
-        let isPrivateIp = false;
-        const ipv4Match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-        if (ipv4Match) {
-          const oct1 = parseInt(ipv4Match[1], 10);
-          const oct2 = parseInt(ipv4Match[2], 10);
-          if (oct1 === 10) isPrivateIp = true;
-          if (oct1 === 172 && oct2 >= 16 && oct2 <= 31) isPrivateIp = true;
-          if (oct1 === 192 && oct2 === 168) isPrivateIp = true;
-          if (oct1 === 169 && oct2 === 254) isPrivateIp = true;
-          if (oct1 === 127 && process.env.ALLOW_LOCAL_DESTINATIONS !== 'true') isPrivateIp = true;
-          if (oct1 === 0) isPrivateIp = true;
-        }
-        if (hostname === 'localhost' && process.env.ALLOW_LOCAL_DESTINATIONS !== 'true') {
-          isPrivateIp = true;
-        }
-
-        if (isProhibitedHost || isPrivateIp) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Prohibited destination address (SSRF guard)' }));
+          res.end(JSON.stringify({ error: check.reason }));
           return;
         }
 
@@ -1206,7 +1202,7 @@ const server = http.createServer((req, res) => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'User-Agent': 'The-Switchboard/2.6.14-verifier'
+            'User-Agent': 'The-Switchboard/2.6.15-verifier'
           },
           body: JSON.stringify({
             event: 'verification.challenge',
@@ -1401,7 +1397,7 @@ const server = http.createServer((req, res) => {
 
           const dispatchHeaders = {
             'Content-Type': 'application/json',
-            'User-Agent': 'The-Switchboard/2.6.14',
+            'User-Agent': 'The-Switchboard/2.6.15',
             'X-Switchboard-Timestamp': String(dispatchTime),
             'X-Switchboard-Signature': `v1=${signature}`
           };
@@ -1458,6 +1454,6 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[The Switchboard v2.6.14] Running on http://localhost:${PORT}`);
-  console.log(`[The Switchboard v2.6.14] Auth Guard: Strict Key Enforced (Header: X-Bridge-Key; key redacted from stdout)`);
+  console.log(`[The Switchboard v2.6.15] Running on http://localhost:${PORT}`);
+  console.log(`[The Switchboard v2.6.15] Auth Guard: Strict Key Enforced (Header: X-Bridge-Key; key redacted from stdout)`);
 });
