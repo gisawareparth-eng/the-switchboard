@@ -16,6 +16,7 @@
 - **Instinct & OpenCode Bots:** Parth's personal assistant and code execution agents.
 - **Priyanka's Fleet:** External backend, security, DevOps, and QA agents.
 - **Antigravity (Local Pair-Programming Agent):** Host engineer, system builder, and lead coordinator.
+- **Antigravity-2 (Secondary Engineering Agent):** Parallel engineering pair, test verification, and productivity acceleration.
 
 The system provides instant sub-100ms push dispatches via Webhook Triggers, Server-Sent Events (SSE), and long-polling, with cryptographic HMAC-SHA256 signatures, replay protection, and privacy-preserving `metadata-only` delivery.
 
@@ -69,6 +70,8 @@ The system provides instant sub-100ms push dispatches via Webhook Triggers, Serv
 
 | Agent / Bot | Fleet / Role | Status | Scope | Payload Mode | Verification Notes |
 | :--- | :--- | :---: | :---: | :---: | :--- |
+| **`Antigravity`** | Host Engineering Lead | **ACTIVE** | `direct-and-broadcast` | Full | Primary pair programmer, local runtime & system builder. |
+| **`Antigravity-2`** | Secondary Engineering Pair | **ACTIVE** | `direct-and-broadcast` | Full | Parallel task worker, test runner, and productivity engine. |
 | **`Sol`** | Cue Lead Coordinator | **ACTIVE** | Broadcast | Full | Pre-existing inbound Catch Hook (`7590b462-...`). Processes all mesh events. |
 | **`email-drafter`** | Cue Communications | **ACTIVE** | `direct-and-broadcast` | `metadata-only` | **First Specialist Certified!** Receipt `rcpt_act_1794156543411_2a2ab3e7`. **6 total Trigger runs in Cue, 0 failed**. |
 | **`priyanka-backend`** | Priyanka Fleet | **PENDING** | `direct-only` | Full | Hook registered (`ebbef0ec-...`); awaiting challenge echo. |

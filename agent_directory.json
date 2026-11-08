@@ -108,5 +108,15 @@
     "name": "Instinct",
     "email": "g3lguk@mail.instinct.com",
     "role": "Parth's primary assistant, task execution, and project testing."
+  },
+  "antigravity": {
+    "name": "Antigravity",
+    "email": "antigravity@local.dev",
+    "role": "Lead pair-programmer, system architect, and runtime coordinator."
+  },
+  "antigravity-2": {
+    "name": "Antigravity 2",
+    "email": "antigravity-2@local.dev",
+    "role": "Secondary engineering pair, parallel task worker, code verification, and productivity acceleration."
   }
 }

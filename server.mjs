@@ -219,7 +219,7 @@ const server = http.createServer((req, res) => {
     .msg-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 0.9rem 1.1rem; max-width: 880px; width: 100%; transition: transform 0.1s ease; border-left: 4px solid #64748b; }
     .msg-card.from-parth, .msg-card.from-manas, .msg-card.is-human { border-left-color: var(--emerald); background: #062b20; border-color: #065f46; }
     .msg-card.from-instinct { border-left-color: var(--purple); background: #18112e; }
-    .msg-card.from-agent, .msg-card.from-antigravity { border-left-color: var(--cyan); background: #0a1f33; }
+    .msg-card.from-agent, .msg-card.from-antigravity, .msg-card.from-antigravity-2 { border-left-color: var(--cyan); background: #0a1f33; }
     .msg-card.from-priyanka-security, .msg-card.from-priyanka-qa { border-left-color: var(--amber); background: #261b0c; }
     .msg-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.45rem; font-size: 0.8rem; }
     .sender-tag { font-weight: 700; display: inline-flex; align-items: center; gap: 0.35rem; }
@@ -266,6 +266,7 @@ const server = http.createServer((req, res) => {
     <span style="color:var(--subtext);">Active Mesh:</span>
     <span class="pill human">👤 Parth</span>
     <span class="pill agent">🤖 Antigravity</span>
+    <span class="pill agent">🤖 Antigravity-2</span>
     <span class="pill instinct">🤖 Instinct</span>
     <span class="pill agent">🤖 Sol</span>
     <span class="pill agent">🤖 priyanka-security</span>
@@ -280,6 +281,8 @@ const server = http.createServer((req, res) => {
     <form class="form-row" id="send-form" onsubmit="event.preventDefault(); sendMessage();">
       <select id="sender-select" class="control-select" title="Speaking as">
         <option value="parth" selected>👤 Parth</option>
+        <option value="antigravity">🤖 Antigravity</option>
+        <option value="antigravity-2">🤖 Antigravity-2</option>
         <option value="manas">👤 Manas</option>
         <option value="human">👤 Guest Human</option>
       </select>
@@ -289,6 +292,7 @@ const server = http.createServer((req, res) => {
       <select id="recipient-select" class="control-select" title="Send to">
         <option value="all" selected>📢 All Agents & Humans</option>
         <option value="antigravity">🤖 Antigravity</option>
+        <option value="antigravity-2">🤖 Antigravity-2</option>
         <option value="instinct">🤖 Instinct</option>
         <option value="Sol">🤖 Sol (20 Specialists)</option>
         <option value="priyanka-security">🤖 priyanka-security</option>
@@ -336,7 +340,7 @@ const server = http.createServer((req, res) => {
     const participantsBar = document.getElementById('participants-list');
     const recipientSelect = document.getElementById('recipient-select');
     const statusBar = document.getElementById('status-bar');
-    const knownSenders = new Set(['parth', 'manas', 'antigravity', 'agent', 'instinct', 'Sol', 'priyanka-security', 'priyanka-qa']);
+    const knownSenders = new Set(['parth', 'manas', 'antigravity', 'antigravity-2', 'agent', 'instinct', 'Sol', 'priyanka-security', 'priyanka-qa']);
     let renderedIds = new Set();
 
     function setStatus(text, color = '#38bdf8', duration = 3000) {
@@ -1251,7 +1255,7 @@ const server = http.createServer((req, res) => {
         const to = payload.to || (from === 'instinct' ? 'antigravity' : 'instinct');
         let text = payload.text;
 
-        if ((from === 'agent' || from === 'antigravity') && !text.includes('[by agent]')) {
+        if ((from === 'agent' || from === 'antigravity' || from === 'antigravity-2') && !text.includes('[by agent]')) {
           text = `${text} [by agent]`;
         }
 
