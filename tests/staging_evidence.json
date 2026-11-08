@@ -1,7 +1,7 @@
 {
-  "suite": "Switchboard_v2.6.0_ProbeChallenge_Pilot",
-  "timestamp": "2026-11-08T16:26:07.259Z",
-  "targetUrl": "http://localhost:3000",
+  "suite": "Switchboard_v2.6.10_ProbeChallenge_Pilot",
+  "timestamp": "2026-11-08T16:40:55.621Z",
+  "targetUrl": "https://asn-transaction-outlined-intersection.trycloudflare.com",
   "allPassed": true,
   "totalTests": 9,
   "results": [
@@ -72,7 +72,7 @@
       "pass": true,
       "details": {
         "status": 400,
-        "error": "Agent 'pilot-sgapo' is currently Disabled. Re-register via /api/webhook/register to obtain a fresh verification challenge."
+        "error": "Agent 'pilot-4tap4' is currently Disabled. Re-register via /api/webhook/register to obtain a fresh verification challenge."
       }
     },
     {

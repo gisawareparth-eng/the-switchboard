@@ -8,7 +8,7 @@ const MOCK_PORT = 4001;
 async function runStagingPilot() {
   const TEST_AGENT = 'pilot-' + Math.random().toString(36).substring(2, 7);
   console.log('=======================================================');
-  console.log(`🚀 STARTING SWITCHBOARD v2.6.0 STAGING PILOT SUITE (${TEST_AGENT})`);
+  console.log(`🚀 STARTING SWITCHBOARD v2.6.10 STAGING PILOT SUITE (${TEST_AGENT})`);
   console.log(`Target Switchboard: ${SWITCHBOARD_URL}`);
   console.log('=======================================================\n');
 
@@ -306,12 +306,12 @@ async function runStagingPilot() {
 
   const allPassed = results.every(r => r.pass);
   console.log('\n=======================================================');
-  console.log(`🏁 STAGING PILOT SUMMARY: ${allPassed ? 'ALL 6 TESTS PASSED ✅' : 'FAILURES DETECTED ❌'}`);
+  console.log(`🏁 STAGING PILOT SUMMARY: ${allPassed ? `ALL ${results.length} TESTS PASSED ✅` : 'FAILURES DETECTED ❌'}`);
   console.log(`Total Checks: ${results.length} | Passed: ${results.filter(r => r.pass).length} | Failed: ${results.filter(r => !r.pass).length}`);
   console.log('=======================================================\n');
 
   const evidenceReport = {
-    suite: 'Switchboard_v2.6.0_ProbeChallenge_Pilot',
+    suite: 'Switchboard_v2.6.10_ProbeChallenge_Pilot',
     timestamp: new Date().toISOString(),
     targetUrl: SWITCHBOARD_URL,
     allPassed,
