@@ -93,7 +93,7 @@ const server = http.createServer((req, res) => {
   // Public health check
   if (url.pathname === '/api/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'healthy', version: '2.6.12', time: new Date().toISOString() }));
+    res.end(JSON.stringify({ status: 'healthy', version: '2.6.13', time: new Date().toISOString() }));
     return;
   }
 
@@ -179,7 +179,7 @@ const server = http.createServer((req, res) => {
     <div class="brand">
       <span class="live-dot"></span>
       <h1>The Switchboard</h1>
-      <span style="font-size:0.75rem; color:var(--subtext); background:#1e293b; padding:0.15rem 0.5rem; border-radius:4px;">Mesh v2.6.12</span>
+      <span style="font-size:0.75rem; color:var(--subtext); background:#1e293b; padding:0.15rem 0.5rem; border-radius:4px;">Mesh v2.6.13</span>
     </div>
     <div style="display:flex; align-items:center; gap:0.75rem; font-size:0.8rem;">
       <span style="color:var(--subtext);">Connected as: <b id="display-user" style="color:var(--emerald);">Parth (Human)</b></span>
@@ -626,7 +626,7 @@ const server = http.createServer((req, res) => {
     });
     res.end(JSON.stringify({
       title: "The Switchboard Webhook Lifecycle & Registration API",
-      version: "2.6.12",
+      version: "2.6.13",
       documentationUrl: "https://switchboard.gisawareparth.workers.dev/api/docs",
       authentication: {
         managementRoutes: {
@@ -801,9 +801,31 @@ const server = http.createServer((req, res) => {
           return;
         }
 
-        // SSRF Guard: reject cloud metadata endpoints and internal link-local addresses
+        // Comprehensive SSRF Guard: reject cloud metadata, internal domains, and private IP blocks
         const hostname = parsedDest.hostname.toLowerCase();
-        if (hostname === '169.254.169.254' || hostname === 'metadata.google.internal' || hostname.endsWith('.internal')) {
+        const isProhibitedHost = (
+          hostname === '169.254.169.254' ||
+          hostname === 'metadata.google.internal' ||
+          hostname.endsWith('.internal') ||
+          hostname.endsWith('.local')
+        );
+        let isPrivateIp = false;
+        const ipv4Match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+        if (ipv4Match) {
+          const oct1 = parseInt(ipv4Match[1], 10);
+          const oct2 = parseInt(ipv4Match[2], 10);
+          if (oct1 === 10) isPrivateIp = true; // 10.0.0.0/8
+          if (oct1 === 172 && oct2 >= 16 && oct2 <= 31) isPrivateIp = true; // 172.16.0.0/12
+          if (oct1 === 192 && oct2 === 168) isPrivateIp = true; // 192.168.0.0/16
+          if (oct1 === 169 && oct2 === 254) isPrivateIp = true; // 169.254.0.0/16
+          if (oct1 === 127 && process.env.ALLOW_LOCAL_DESTINATIONS !== 'true') isPrivateIp = true; // Loopback
+          if (oct1 === 0) isPrivateIp = true;
+        }
+        if (hostname === 'localhost' && process.env.ALLOW_LOCAL_DESTINATIONS !== 'true') {
+          isPrivateIp = true;
+        }
+
+        if (isProhibitedHost || isPrivateIp) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Prohibited destination address (SSRF guard)' }));
           return;
@@ -874,7 +896,7 @@ const server = http.createServer((req, res) => {
         try {
           const probeHeaders = {
             'Content-Type': 'application/json',
-            'User-Agent': 'The-Switchboard/2.6.12-verifier'
+            'User-Agent': 'The-Switchboard/2.6.13-verifier'
           };
           if (authHeader) probeHeaders['Authorization'] = authHeader;
 
@@ -1133,7 +1155,7 @@ const server = http.createServer((req, res) => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'User-Agent': 'The-Switchboard/2.6.12-verifier'
+            'User-Agent': 'The-Switchboard/2.6.13-verifier'
           },
           body: JSON.stringify({
             event: 'verification.challenge',
@@ -1327,7 +1349,7 @@ const server = http.createServer((req, res) => {
 
           const dispatchHeaders = {
             'Content-Type': 'application/json',
-            'User-Agent': 'The-Switchboard/2.6.12',
+            'User-Agent': 'The-Switchboard/2.6.13',
             'X-Switchboard-Timestamp': String(dispatchTime),
             'X-Switchboard-Signature': `v1=${signature}`
           };
@@ -1384,6 +1406,6 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[The Switchboard v2.6.12] Running on http://localhost:${PORT}`);
-  console.log(`[The Switchboard v2.6.12] Shared Key: ${BRIDGE_KEY}`);
+  console.log(`[The Switchboard v2.6.13] Running on http://localhost:${PORT}`);
+  console.log(`[The Switchboard v2.6.13] Auth Guard: Strict Key Enforced (Header: X-Bridge-Key; key redacted from stdout)`);
 });

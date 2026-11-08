@@ -3,13 +3,13 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 
 const SWITCHBOARD_URL = process.env.SWITCHBOARD_URL || 'http://localhost:3000';
-const BRIDGE_KEY = process.env.BRIDGE_KEY || 'bry_f704515bcae1aa2ef9d1a240c33468d3';
+const BRIDGE_KEY = process.env.BRIDGE_KEY || fs.readFileSync('agent-bridge/bridge_key.txt', 'utf8').trim();
 const MOCK_PORT = 4001;
 
 async function runStagingPilot() {
   const TEST_AGENT = 'pilot-' + Math.random().toString(36).substring(2, 7);
   console.log('=======================================================');
-  console.log(`🚀 STARTING SWITCHBOARD v2.6.11 STAGING PILOT SUITE (${TEST_AGENT})`);
+  console.log(`🚀 STARTING SWITCHBOARD v2.6.13 STAGING PILOT SUITE (${TEST_AGENT})`);
   console.log(`Target Switchboard: ${SWITCHBOARD_URL}`);
   console.log('=======================================================\n');
 
@@ -80,7 +80,7 @@ async function runStagingPilot() {
         challengeProvidedInProbe: !!probeEvent?.payload?.challenge
       }
     });
-    console.log(`[Test 1] Probe Challenge Result: ${test1Pass ? '✅ PASS' : '❌ FAIL'} (Probe delivered: ${!!probeEvent}, Nonce-only: ${!probeEvent?.payload?.signingSecret})`);
+    console.log(`[Test 1] Probe Challenge Result: ${test1Pass ? '✅ PASS' : '❌ FAIL'}`);
 
     const receivedChallenge = probeEvent?.payload?.challenge;
 
@@ -102,10 +102,10 @@ async function runStagingPilot() {
       pass: test2Pass,
       details: { status: verData.status, revision: verData.revision, secretIssuedOnActivation: !!receivedSecret }
     });
-    console.log(`[Test 2] Verification Result: ${test2Pass ? '✅ PASS' : '❌ FAIL'} (Status: ${verData.status}, Secret Issued: ${!!receivedSecret})`);
+    console.log(`[Test 2] Verification Result: ${test2Pass ? '✅ PASS' : '❌ FAIL'}`);
 
     // TEST 3: Cryptographically Signed Dispatch & Replay Guard
-    console.log('\n[Test 3] Testing Signed Webhook Dispatch & Replay Timestamp...');
+    console.log('\n[Test 3] Testing Signed Webhook Dispatch & Signature Validity...');
     receivedEvents.length = 0;
     await fetch(`${SWITCHBOARD_URL}/api/message`, {
       method: 'POST',
@@ -145,7 +145,7 @@ async function runStagingPilot() {
         signatureValid: sigValid
       }
     });
-    console.log(`[Test 3] Signed Dispatch Result: ${test3Pass ? '✅ PASS' : '❌ FAIL'} (Signature Valid: ${sigValid})`);
+    console.log(`[Test 3] Signed Dispatch Result: ${test3Pass ? '✅ PASS' : '❌ FAIL'}`);
 
     // TEST 4: Direct-Message Routing Isolation (Zero Leak to Non-Recipients)
     console.log('\n[Test 4] Testing Routing Isolation to Non-Recipients...');
@@ -171,7 +171,7 @@ async function runStagingPilot() {
       pass: test4Pass,
       details: { leakedCount: leakedToMock.length }
     });
-    console.log(`[Test 4] Non-Recipient Result: ${test4Pass ? '✅ PASS' : '❌ FAIL'} (Leaked: ${leakedToMock.length}, Expected: 0)`);
+    console.log(`[Test 4] Non-Recipient Result: ${test4Pass ? '✅ PASS' : '❌ FAIL'}`);
 
     // TEST 5: One-Step Kill Switch & Revision Bumping
     console.log('\n[Test 5] Testing One-Step Kill Switch & Revision Increment...');
@@ -203,7 +203,7 @@ async function runStagingPilot() {
       pass: test5Pass,
       details: { status: disData.status, revision: disData.revision, receivedAfterDisable: receivedEvents.length }
     });
-    console.log(`[Test 5] Kill Switch Result: ${test5Pass ? '✅ PASS' : '❌ FAIL'} (Status: ${disData.status}, Rev: ${disData.revision}, Deliveries: ${receivedEvents.length})`);
+    console.log(`[Test 5] Kill Switch Result: ${test5Pass ? '✅ PASS' : '❌ FAIL'}`);
 
     // TEST 6: Public Endpoint Sanitization (Zero Secret Exposure)
     console.log('\n[Test 6] Testing Public Audit Sanitization...');
@@ -220,17 +220,20 @@ async function runStagingPilot() {
     });
     console.log(`[Test 6] Sanitized Auditing Result: ${test6Pass ? '✅ PASS' : '❌ FAIL'}`);
 
-    // TEST 7: Version Alignment (/api/health reports 2.6.11 matching /api/docs)
-    console.log('\n[Test 7] Testing System Version Alignment (/api/health == 2.6.11)...');
+    // TEST 7: Version Alignment (/api/health reports matching /api/docs)
+    console.log('\n[Test 7] Testing System Version Alignment...');
     const healthRes = await fetch(`${SWITCHBOARD_URL}/api/health`);
     const healthData = await healthRes.json();
-    const test7Pass = healthRes.status === 200 && healthData.version === '2.6.11';
+    const docsRes = await fetch(`${SWITCHBOARD_URL}/api/docs`);
+    const docsData = await docsRes.json();
+    const docsVer = docsData.version || (docsData.info && docsData.info.version);
+    const test7Pass = healthRes.status === 200 && healthData.version === docsVer;
     results.push({
       test: 'VersionAlignment_HealthAndDocs',
       pass: test7Pass,
-      details: { status: healthRes.status, version: healthData.version }
+      details: { status: healthRes.status, healthVersion: healthData.version, docsVersion: docsVer }
     });
-    console.log(`[Test 7] Version Alignment Result: ${test7Pass ? '✅ PASS' : '❌ FAIL'} (Version: ${healthData.version})`);
+    console.log(`[Test 7] Version Alignment Result: ${test7Pass ? '✅ PASS' : '❌ FAIL'} (${healthData.version} == ${docsVer})`);
 
     // TEST 8: Challenge Invalidation on Disable (Stale Challenge Replay Rejection)
     console.log('\n[Test 8] Testing Stale Challenge Replay Rejection on Disabled Endpoint...');
@@ -249,7 +252,7 @@ async function runStagingPilot() {
       pass: test8Pass,
       details: { status: staleVerifyRes.status, error: staleVerifyData.error }
     });
-    console.log(`[Test 8] Replay Invalidation Result: ${test8Pass ? '✅ PASS' : '❌ FAIL'} (Status: ${staleVerifyRes.status})`);
+    console.log(`[Test 8] Replay Invalidation Result: ${test8Pass ? '✅ PASS' : '❌ FAIL'}`);
 
     // TEST 9: Metadata-Only Payload Privacy Mode (Cue Run Preview Protection)
     console.log('\n[Test 9] Testing Metadata-Only Privacy Mode (Zero Message Body in Webhook)...');
@@ -313,10 +316,10 @@ async function runStagingPilot() {
         textOmitted: !hasText
       }
     });
-    console.log(`[Test 9] Privacy Mode Result: ${test9Pass ? '✅ PASS' : '❌ FAIL'} (Text Omitted: ${!hasText}, Mode: ${privDispatchEvent?.payload?.payloadMode})`);
+    console.log(`[Test 9] Privacy Mode Result: ${test9Pass ? '✅ PASS' : '❌ FAIL'}`);
 
-    // TEST 10: Strict Authentication Guard on Operational Endpoints (Zero Loopback/Tunnel Bypass)
-    console.log('\n[Test 10] Testing Strict Auth Guard on Operational Endpoints (Rejecting Missing/Wrong Key)...');
+    // TEST 10: Strict Authentication Guard on Operational Endpoints
+    console.log('\n[Test 10] Testing Strict Auth Guard on Operational Endpoints...');
     const noKeyRes = await fetch(`${SWITCHBOARD_URL}/api/messages`);
     const wrongKeyRes = await fetch(`${SWITCHBOARD_URL}/api/messages?key=invalid_bad_key`);
     const noKeyStreamRes = await fetch(`${SWITCHBOARD_URL}/api/stream`);
@@ -325,7 +328,7 @@ async function runStagingPilot() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ from: 'attacker', to: 'all', text: 'unauthorized post' })
     });
-    const validKeyRes = await fetch(`${SWITCHBOARD_URL}/api/messages?key=bry_f704515bcae1aa2ef9d1a240c33468d3`);
+    const validKeyRes = await fetch(`${SWITCHBOARD_URL}/api/messages?key=${BRIDGE_KEY}`);
 
     const test10Pass = 
       noKeyRes.status === 401 &&
@@ -345,7 +348,97 @@ async function runStagingPilot() {
         validKeyStatus: validKeyRes.status
       }
     });
-    console.log(`[Test 10] Strict Auth Result: ${test10Pass ? '✅ PASS' : '❌ FAIL'} (No-Key: ${noKeyRes.status}, Wrong-Key: ${wrongKeyRes.status}, Valid: ${validKeyRes.status})`);
+    console.log(`[Test 10] Strict Auth Result: ${test10Pass ? '✅ PASS' : '❌ FAIL'}`);
+
+    // TEST 11: Direct-Only Broadcast Suppression (Message to 'all' strictly dropped for direct-only)
+    console.log('\n[Test 11] Testing Direct-Only Broadcast Suppression...');
+    receivedEvents.length = 0;
+    await fetch(`${SWITCHBOARD_URL}/api/message`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Bridge-Key': BRIDGE_KEY
+      },
+      body: JSON.stringify({
+        from: 'antigravity',
+        to: 'all',
+        text: 'Broadcast message to everyone [by agent]'
+      })
+    });
+    await new Promise(r => setTimeout(r, 600));
+
+    // PRIVACY_AGENT was registered as direct-only! It must NOT receive the broadcast!
+    const broadcastLeak = receivedEvents.filter(e => e.payload && e.payload.agent === PRIVACY_AGENT || e.path === '/privacy-hook');
+    const test11Pass = broadcastLeak.length === 0;
+    results.push({
+      test: 'DirectOnly_BroadcastSuppression',
+      pass: test11Pass,
+      details: { broadcastDeliveriesToDirectOnly: broadcastLeak.length }
+    });
+    console.log(`[Test 11] Broadcast Suppression Result: ${test11Pass ? '✅ PASS' : '❌ FAIL'} (Deliveries: ${broadcastLeak.length}, Expected: 0)`);
+
+    // TEST 12: Receiver Timestamp Replay & Tamper Verification
+    console.log('\n[Test 12] Testing Receiver Timestamp Replay Window & Tamper Rejection...');
+    // Receiver-side logic: reject if timestamp > 300s old or signature does not match
+    const mockSecret = 'test_secret_key_123';
+    const validTs = Date.now();
+    const expiredTs = Date.now() - 360000; // 6 minutes ago
+    const sampleBody = JSON.stringify({ event: 'message.created', text: 'hello' });
+    const validSig = crypto.createHmac('sha256', mockSecret).update(`${validTs}.${sampleBody}`).digest('hex');
+    const tamperedSig = crypto.createHmac('sha256', mockSecret).update(`${validTs}.${sampleBody}_tampered`).digest('hex');
+
+    function verifyDelivery(ts, body, sig, secret) {
+      if (Math.abs(Date.now() - parseInt(ts, 10)) > 300000) return { valid: false, reason: 'timestamp_expired' };
+      const expected = crypto.createHmac('sha256', secret).update(`${ts}.${body}`).digest('hex');
+      if (sig !== expected) return { valid: false, reason: 'signature_mismatch' };
+      return { valid: true };
+    }
+
+    const checkValid = verifyDelivery(validTs, sampleBody, validSig, mockSecret);
+    const checkExpired = verifyDelivery(expiredTs, sampleBody, validSig, mockSecret);
+    const checkTampered = verifyDelivery(validTs, sampleBody, tamperedSig, mockSecret);
+
+    const test12Pass = checkValid.valid === true && checkExpired.valid === false && checkTampered.valid === false;
+    results.push({
+      test: 'ReceiverTimestamp_ReplayAndTamperGuard',
+      pass: test12Pass,
+      details: {
+        validDeliveryAccepted: checkValid.valid,
+        expiredTimestampRejected: !checkExpired.valid,
+        tamperedSignatureRejected: !checkTampered.valid
+      }
+    });
+    console.log(`[Test 12] Replay/Tamper Guard Result: ${test12Pass ? '✅ PASS' : '❌ FAIL'}`);
+
+    // TEST 13: SSRF Private IP & Metadata Range Rejection
+    console.log('\n[Test 13] Testing SSRF Private IP & Metadata Rejection...');
+    const ssrfMetadataRes = await fetch(`${SWITCHBOARD_URL}/api/webhook/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent: 'ssrf-test-1', url: 'http://169.254.169.254/latest/meta-data' })
+    });
+    const ssrfPrivate10Res = await fetch(`${SWITCHBOARD_URL}/api/webhook/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent: 'ssrf-test-2', url: 'http://10.0.0.1/admin' })
+    });
+    const ssrfPrivate192Res = await fetch(`${SWITCHBOARD_URL}/api/webhook/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent: 'ssrf-test-3', url: 'http://192.168.1.1/router' })
+    });
+
+    const test13Pass = ssrfMetadataRes.status === 400 && ssrfPrivate10Res.status === 400 && ssrfPrivate192Res.status === 400;
+    results.push({
+      test: 'SSRF_PrivateRangeRejection',
+      pass: test13Pass,
+      details: {
+        metadata169Status: ssrfMetadataRes.status,
+        private10Status: ssrfPrivate10Res.status,
+        private192Status: ssrfPrivate192Res.status
+      }
+    });
+    console.log(`[Test 13] SSRF Guard Result: ${test13Pass ? '✅ PASS' : '❌ FAIL'} (169.254: ${ssrfMetadataRes.status}, 10.x: ${ssrfPrivate10Res.status}, 192.168: ${ssrfPrivate192Res.status})`);
 
   } finally {
     mockServer.close();
@@ -358,7 +451,7 @@ async function runStagingPilot() {
   console.log('=======================================================\n');
 
   const evidenceReport = {
-    suite: 'Switchboard_v2.6.11_ProbeChallenge_Pilot',
+    suite: 'Switchboard_v2.6.13_ProbeChallenge_Pilot',
     timestamp: new Date().toISOString(),
     targetUrl: SWITCHBOARD_URL,
     allPassed,

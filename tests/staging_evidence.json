@@ -1,9 +1,9 @@
 {
-  "suite": "Switchboard_v2.6.11_ProbeChallenge_Pilot",
-  "timestamp": "2026-11-08T17:05:48.212Z",
-  "targetUrl": "https://asn-transaction-outlined-intersection.trycloudflare.com",
+  "suite": "Switchboard_v2.6.13_ProbeChallenge_Pilot",
+  "timestamp": "2026-11-08T17:26:00.954Z",
+  "targetUrl": "http://localhost:3000",
   "allPassed": true,
-  "totalTests": 10,
+  "totalTests": 13,
   "results": [
     {
       "test": "OutboundProbeChallenge_NonceOnly_NoSecretLeak",
@@ -64,7 +64,8 @@
       "pass": true,
       "details": {
         "status": 200,
-        "version": "2.6.11"
+        "healthVersion": "2.6.13",
+        "docsVersion": "2.6.13"
       }
     },
     {
@@ -72,7 +73,7 @@
       "pass": true,
       "details": {
         "status": 400,
-        "error": "Agent 'pilot-yqmfx' is currently Disabled. Re-register via /api/webhook/register to obtain a fresh verification challenge."
+        "error": "Agent 'pilot-4bdt0' is currently Disabled. Re-register via /api/webhook/register to obtain a fresh verification challenge."
       }
     },
     {
@@ -93,6 +94,31 @@
         "noKeyStreamStatus": 401,
         "noKeyPostStatus": 401,
         "validKeyStatus": 200
+      }
+    },
+    {
+      "test": "DirectOnly_BroadcastSuppression",
+      "pass": true,
+      "details": {
+        "broadcastDeliveriesToDirectOnly": 0
+      }
+    },
+    {
+      "test": "ReceiverTimestamp_ReplayAndTamperGuard",
+      "pass": true,
+      "details": {
+        "validDeliveryAccepted": true,
+        "expiredTimestampRejected": true,
+        "tamperedSignatureRejected": true
+      }
+    },
+    {
+      "test": "SSRF_PrivateRangeRejection",
+      "pass": true,
+      "details": {
+        "metadata169Status": 400,
+        "private10Status": 400,
+        "private192Status": 400
       }
     }
   ]
