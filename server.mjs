@@ -466,8 +466,17 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Auth guard for operational API endpoints
-  if (!isAuthenticated(req, url)) {
+  // Explicitly permit public self-service webhook management & doc routes (Zero Master Key Required)
+  const isPublicWebhookRoute = 
+    url.pathname === '/api/docs' ||
+    url.pathname === '/api/webhook/receipts' ||
+    url.pathname === '/api/webhook/register' ||
+    url.pathname === '/api/webhook/verify' ||
+    url.pathname === '/api/webhook/disable' ||
+    url.pathname === '/api/webhook/rotate';
+
+  // Auth guard for operational API endpoints (Stream, Chat message posting, Raw message polling)
+  if (!isPublicWebhookRoute && !isAuthenticated(req, url)) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Unauthorized: missing or invalid X-Bridge-Key' }));
     return;
