@@ -9,7 +9,7 @@ const MOCK_PORT = 4001;
 async function runStagingPilot() {
   const TEST_AGENT = 'pilot-' + Math.random().toString(36).substring(2, 7);
   console.log('=======================================================');
-  console.log(`🚀 STARTING SWITCHBOARD v2.6.13 STAGING PILOT SUITE (${TEST_AGENT})`);
+  console.log(`🚀 STARTING SWITCHBOARD v2.6.14 STAGING PILOT SUITE (${TEST_AGENT})`);
   console.log(`Target Switchboard: ${SWITCHBOARD_URL}`);
   console.log('=======================================================\n');
 
@@ -103,6 +103,25 @@ async function runStagingPilot() {
       details: { status: verData.status, revision: verData.revision, secretIssuedOnActivation: !!receivedSecret }
     });
     console.log(`[Test 2] Verification Result: ${test2Pass ? '✅ PASS' : '❌ FAIL'}`);
+
+    // TEST 2b: Consumed Challenge Replay Rejection (replay used nonce against still-Active endpoint)
+    console.log('\n[Test 2b] Replaying Consumed Challenge Against Active Endpoint...');
+    const replayRes = await fetch(`${SWITCHBOARD_URL}/api/webhook/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        agent: TEST_AGENT,
+        challenge: receivedChallenge
+      })
+    });
+    const replayData = await replayRes.json();
+    const test2bPass = replayRes.status >= 400 && !replayData.success && !replayData.signingSecret;
+    results.push({
+      test: 'ConsumedChallenge_ReplayRejectedWhileActive',
+      pass: test2bPass,
+      details: { status: replayRes.status, error: replayData.error, secretReIssued: !!replayData.signingSecret }
+    });
+    console.log(`[Test 2b] Consumed Challenge Replay Result: ${test2bPass ? '✅ PASS' : '❌ FAIL'}`);
 
     // TEST 3: Cryptographically Signed Dispatch & Replay Guard
     console.log('\n[Test 3] Testing Signed Webhook Dispatch & Signature Validity...');
@@ -451,7 +470,7 @@ async function runStagingPilot() {
   console.log('=======================================================\n');
 
   const evidenceReport = {
-    suite: 'Switchboard_v2.6.13_ProbeChallenge_Pilot',
+    suite: 'Switchboard_v2.6.14_ProbeChallenge_Pilot',
     timestamp: new Date().toISOString(),
     targetUrl: SWITCHBOARD_URL,
     allPassed,

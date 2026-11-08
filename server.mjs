@@ -93,7 +93,7 @@ const server = http.createServer((req, res) => {
   // Public health check
   if (url.pathname === '/api/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'healthy', version: '2.6.13', time: new Date().toISOString() }));
+    res.end(JSON.stringify({ status: 'healthy', version: '2.6.14', time: new Date().toISOString() }));
     return;
   }
 
@@ -179,7 +179,7 @@ const server = http.createServer((req, res) => {
     <div class="brand">
       <span class="live-dot"></span>
       <h1>The Switchboard</h1>
-      <span style="font-size:0.75rem; color:var(--subtext); background:#1e293b; padding:0.15rem 0.5rem; border-radius:4px;">Mesh v2.6.13</span>
+      <span style="font-size:0.75rem; color:var(--subtext); background:#1e293b; padding:0.15rem 0.5rem; border-radius:4px;">Mesh v2.6.14</span>
     </div>
     <div style="display:flex; align-items:center; gap:0.75rem; font-size:0.8rem;">
       <span style="color:var(--subtext);">Connected as: <b id="display-user" style="color:var(--emerald);">Parth (Human)</b></span>
@@ -242,11 +242,15 @@ const server = http.createServer((req, res) => {
   </footer>
 
   <script>
-    const serverKey = '${BRIDGE_KEY}';
     const urlParams = new URLSearchParams(window.location.search);
-    let key = urlParams.get('key') || localStorage.getItem('switchboard_key') || serverKey;
-    if (!key || key === 'null' || key === 'undefined') key = serverKey;
-    localStorage.setItem('switchboard_key', key);
+    let key = urlParams.get('key') || localStorage.getItem('switchboard_key') || '';
+    if (key && key !== 'null' && key !== 'undefined') {
+      localStorage.setItem('switchboard_key', key);
+    } else {
+      // Key is not exposed in HTML source for zero-trust security
+      const stored = localStorage.getItem('switchboard_key');
+      if (stored) key = stored;
+    }
 
     document.getElementById('copy-key-btn').addEventListener('click', () => {
       navigator.clipboard.writeText(key).then(() => {
@@ -626,7 +630,7 @@ const server = http.createServer((req, res) => {
     });
     res.end(JSON.stringify({
       title: "The Switchboard Webhook Lifecycle & Registration API",
-      version: "2.6.13",
+      version: "2.6.14",
       documentationUrl: "https://switchboard.gisawareparth.workers.dev/api/docs",
       authentication: {
         managementRoutes: {
@@ -840,7 +844,7 @@ const server = http.createServer((req, res) => {
         // Alias Hijack Defense: if already Active, require previousSecret or master key
         if (existing.status === 'Active') {
           const hasProof = payload.previousSecret && payload.previousSecret === existing.signingSecret;
-          const hasMasterKey = req.headers['x-bridge-key'] === SHARED_KEY;
+          const hasMasterKey = req.headers['x-bridge-key'] === BRIDGE_KEY;
           if (!hasProof && !hasMasterKey) {
             res.writeHead(409, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
@@ -896,7 +900,7 @@ const server = http.createServer((req, res) => {
         try {
           const probeHeaders = {
             'Content-Type': 'application/json',
-            'User-Agent': 'The-Switchboard/2.6.13-verifier'
+            'User-Agent': 'The-Switchboard/2.6.14-verifier'
           };
           if (authHeader) probeHeaders['Authorization'] = authHeader;
 
@@ -935,6 +939,7 @@ const server = http.createServer((req, res) => {
               if (d) {
                 d.status = 'Active';
                 d.verifiedAt = Date.now();
+                d.challenge = null;
                 if (!currentCfg.webhooks) currentCfg.webhooks = {};
                 currentCfg.webhooks[agentName] = d.url;
                 if (agentName === 'sol') currentCfg.sol_webhook_url = d.url;
@@ -1030,6 +1035,7 @@ const server = http.createServer((req, res) => {
 
         dest.status = 'Active';
         dest.verifiedAt = Date.now();
+        dest.challenge = null;
         if (!cfg.webhooks) cfg.webhooks = {};
         cfg.webhooks[agentName] = dest.url;
         if (agentName === 'sol') cfg.sol_webhook_url = dest.url;
@@ -1129,6 +1135,51 @@ const server = http.createServer((req, res) => {
           return;
         }
 
+        if (!newUrl.startsWith('http://') && !newUrl.startsWith('https://')) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Webhook URL must start with http:// or https://' }));
+          return;
+        }
+
+        let parsedDest;
+        try {
+          parsedDest = new URL(newUrl);
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Malformed webhook URL' }));
+          return;
+        }
+
+        // Comprehensive SSRF Guard
+        const hostname = parsedDest.hostname.toLowerCase();
+        const isProhibitedHost = (
+          hostname === '169.254.169.254' ||
+          hostname === 'metadata.google.internal' ||
+          hostname.endsWith('.internal') ||
+          hostname.endsWith('.local')
+        );
+        let isPrivateIp = false;
+        const ipv4Match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+        if (ipv4Match) {
+          const oct1 = parseInt(ipv4Match[1], 10);
+          const oct2 = parseInt(ipv4Match[2], 10);
+          if (oct1 === 10) isPrivateIp = true;
+          if (oct1 === 172 && oct2 >= 16 && oct2 <= 31) isPrivateIp = true;
+          if (oct1 === 192 && oct2 === 168) isPrivateIp = true;
+          if (oct1 === 169 && oct2 === 254) isPrivateIp = true;
+          if (oct1 === 127 && process.env.ALLOW_LOCAL_DESTINATIONS !== 'true') isPrivateIp = true;
+          if (oct1 === 0) isPrivateIp = true;
+        }
+        if (hostname === 'localhost' && process.env.ALLOW_LOCAL_DESTINATIONS !== 'true') {
+          isPrivateIp = true;
+        }
+
+        if (isProhibitedHost || isPrivateIp) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Prohibited destination address (SSRF guard)' }));
+          return;
+        }
+
         const cfg = getWebhookConfig();
         if (!cfg.destinations) cfg.destinations = {};
         const dest = cfg.destinations[agentName] || {};
@@ -1155,7 +1206,7 @@ const server = http.createServer((req, res) => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'User-Agent': 'The-Switchboard/2.6.13-verifier'
+            'User-Agent': 'The-Switchboard/2.6.14-verifier'
           },
           body: JSON.stringify({
             event: 'verification.challenge',
@@ -1237,6 +1288,7 @@ const server = http.createServer((req, res) => {
           if (dest && dest.status === 'Pending' && dest.challenge === candidateNonce) {
             dest.status = 'Active';
             dest.verifiedAt = Date.now();
+            dest.challenge = null;
             if (!cfg.webhooks) cfg.webhooks = {};
             cfg.webhooks[senderLower] = dest.url;
             if (senderLower === 'sol') cfg.sol_webhook_url = dest.url;
@@ -1349,7 +1401,7 @@ const server = http.createServer((req, res) => {
 
           const dispatchHeaders = {
             'Content-Type': 'application/json',
-            'User-Agent': 'The-Switchboard/2.6.13',
+            'User-Agent': 'The-Switchboard/2.6.14',
             'X-Switchboard-Timestamp': String(dispatchTime),
             'X-Switchboard-Signature': `v1=${signature}`
           };
@@ -1406,6 +1458,6 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[The Switchboard v2.6.13] Running on http://localhost:${PORT}`);
-  console.log(`[The Switchboard v2.6.13] Auth Guard: Strict Key Enforced (Header: X-Bridge-Key; key redacted from stdout)`);
+  console.log(`[The Switchboard v2.6.14] Running on http://localhost:${PORT}`);
+  console.log(`[The Switchboard v2.6.14] Auth Guard: Strict Key Enforced (Header: X-Bridge-Key; key redacted from stdout)`);
 });

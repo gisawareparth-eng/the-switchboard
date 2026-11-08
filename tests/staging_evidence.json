@@ -1,9 +1,9 @@
 {
-  "suite": "Switchboard_v2.6.13_ProbeChallenge_Pilot",
-  "timestamp": "2026-11-08T17:26:00.954Z",
+  "suite": "Switchboard_v2.6.14_ProbeChallenge_Pilot",
+  "timestamp": "2026-11-08T17:33:01.143Z",
   "targetUrl": "http://localhost:3000",
   "allPassed": true,
-  "totalTests": 13,
+  "totalTests": 14,
   "results": [
     {
       "test": "OutboundProbeChallenge_NonceOnly_NoSecretLeak",
@@ -23,6 +23,15 @@
         "status": "Active",
         "revision": 1,
         "secretIssuedOnActivation": true
+      }
+    },
+    {
+      "test": "ConsumedChallenge_ReplayRejectedWhileActive",
+      "pass": true,
+      "details": {
+        "status": 403,
+        "error": "Invalid, missing, or expired verification challenge nonce",
+        "secretReIssued": false
       }
     },
     {
@@ -64,8 +73,8 @@
       "pass": true,
       "details": {
         "status": 200,
-        "healthVersion": "2.6.13",
-        "docsVersion": "2.6.13"
+        "healthVersion": "2.6.14",
+        "docsVersion": "2.6.14"
       }
     },
     {
@@ -73,7 +82,7 @@
       "pass": true,
       "details": {
         "status": 400,
-        "error": "Agent 'pilot-4bdt0' is currently Disabled. Re-register via /api/webhook/register to obtain a fresh verification challenge."
+        "error": "Agent 'pilot-mwfb6' is currently Disabled. Re-register via /api/webhook/register to obtain a fresh verification challenge."
       }
     },
     {
