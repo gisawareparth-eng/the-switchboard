@@ -93,7 +93,7 @@ const server = http.createServer((req, res) => {
   // Public health check
   if (url.pathname === '/api/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'healthy', version: '2.6.11', time: new Date().toISOString() }));
+    res.end(JSON.stringify({ status: 'healthy', version: '2.6.12', time: new Date().toISOString() }));
     return;
   }
 
@@ -179,7 +179,7 @@ const server = http.createServer((req, res) => {
     <div class="brand">
       <span class="live-dot"></span>
       <h1>The Switchboard</h1>
-      <span style="font-size:0.75rem; color:var(--subtext); background:#1e293b; padding:0.15rem 0.5rem; border-radius:4px;">Mesh v2.6.11</span>
+      <span style="font-size:0.75rem; color:var(--subtext); background:#1e293b; padding:0.15rem 0.5rem; border-radius:4px;">Mesh v2.6.12</span>
     </div>
     <div style="display:flex; align-items:center; gap:0.75rem; font-size:0.8rem;">
       <span style="color:var(--subtext);">Connected as: <b id="display-user" style="color:var(--emerald);">Parth (Human)</b></span>
@@ -626,7 +626,7 @@ const server = http.createServer((req, res) => {
     });
     res.end(JSON.stringify({
       title: "The Switchboard Webhook Lifecycle & Registration API",
-      version: "2.6.11",
+      version: "2.6.12",
       documentationUrl: "https://switchboard.gisawareparth.workers.dev/api/docs",
       authentication: {
         managementRoutes: {
@@ -792,6 +792,23 @@ const server = http.createServer((req, res) => {
           return;
         }
 
+        let parsedDest;
+        try {
+          parsedDest = new URL(webhookUrl);
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Malformed webhook URL' }));
+          return;
+        }
+
+        // SSRF Guard: reject cloud metadata endpoints and internal link-local addresses
+        const hostname = parsedDest.hostname.toLowerCase();
+        if (hostname === '169.254.169.254' || hostname === 'metadata.google.internal' || hostname.endsWith('.internal')) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Prohibited destination address (SSRF guard)' }));
+          return;
+        }
+
         const cfg = getWebhookConfig();
         if (!cfg.destinations) cfg.destinations = {};
         if (!cfg.webhooks) cfg.webhooks = {};
@@ -857,7 +874,7 @@ const server = http.createServer((req, res) => {
         try {
           const probeHeaders = {
             'Content-Type': 'application/json',
-            'User-Agent': 'The-Switchboard/2.6.11-verifier'
+            'User-Agent': 'The-Switchboard/2.6.12-verifier'
           };
           if (authHeader) probeHeaders['Authorization'] = authHeader;
 
@@ -918,7 +935,7 @@ const server = http.createServer((req, res) => {
             }
           }
         } catch (err) {
-          console.error(`[Verifier] Probe dispatch failed for ${agentName} (${webhookUrl}): ${err.message}`);
+          console.error(`[Verifier] Probe dispatch failed for ${agentName}: ${err.message}`);
         }
 
         if (isSyncVerified) {
@@ -1116,7 +1133,7 @@ const server = http.createServer((req, res) => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'User-Agent': 'The-Switchboard/2.6.11-verifier'
+            'User-Agent': 'The-Switchboard/2.6.12-verifier'
           },
           body: JSON.stringify({
             event: 'verification.challenge',
@@ -1310,7 +1327,7 @@ const server = http.createServer((req, res) => {
 
           const dispatchHeaders = {
             'Content-Type': 'application/json',
-            'User-Agent': 'The-Switchboard/2.6.11',
+            'User-Agent': 'The-Switchboard/2.6.12',
             'X-Switchboard-Timestamp': String(dispatchTime),
             'X-Switchboard-Signature': `v1=${signature}`
           };
@@ -1367,6 +1384,6 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[The Switchboard v2.6.11] Running on http://localhost:${PORT}`);
-  console.log(`[The Switchboard v2.6.11] Shared Key: ${BRIDGE_KEY}`);
+  console.log(`[The Switchboard v2.6.12] Running on http://localhost:${PORT}`);
+  console.log(`[The Switchboard v2.6.12] Shared Key: ${BRIDGE_KEY}`);
 });
