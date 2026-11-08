@@ -102,4 +102,4 @@ Run the deterministic staging pilot suite:
 ```bash
 node tests/staging_pilot.mjs
 ```
-Runs 9 automated tests validating probe challenges, synchronous handshake, HMAC signing, routing isolation, disable kill switch, public audit sanitization, version alignment, stale challenge replay rejection, and metadata-only privacy mode.
+Runs 10 automated tests validating probe challenges, synchronous handshake, HMAC signing, routing isolation, disable kill switch, public audit sanitization, version alignment, stale challenge replay rejection, metadata-only privacy mode, and strict authentication guarding against loopback/tunnel bypass.

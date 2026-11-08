@@ -1,9 +1,9 @@
 {
-  "suite": "Switchboard_v2.6.10_ProbeChallenge_Pilot",
-  "timestamp": "2026-11-08T16:40:55.621Z",
+  "suite": "Switchboard_v2.6.11_ProbeChallenge_Pilot",
+  "timestamp": "2026-11-08T17:05:48.212Z",
   "targetUrl": "https://asn-transaction-outlined-intersection.trycloudflare.com",
   "allPassed": true,
-  "totalTests": 9,
+  "totalTests": 10,
   "results": [
     {
       "test": "OutboundProbeChallenge_NonceOnly_NoSecretLeak",
@@ -64,7 +64,7 @@
       "pass": true,
       "details": {
         "status": 200,
-        "version": "2.6.10"
+        "version": "2.6.11"
       }
     },
     {
@@ -72,7 +72,7 @@
       "pass": true,
       "details": {
         "status": 400,
-        "error": "Agent 'pilot-4tap4' is currently Disabled. Re-register via /api/webhook/register to obtain a fresh verification challenge."
+        "error": "Agent 'pilot-yqmfx' is currently Disabled. Re-register via /api/webhook/register to obtain a fresh verification challenge."
       }
     },
     {
@@ -82,6 +82,17 @@
         "received": true,
         "mode": "metadata-only",
         "textOmitted": true
+      }
+    },
+    {
+      "test": "StrictAuthGuard_ZeroLoopbackBypass",
+      "pass": true,
+      "details": {
+        "noKeyStatus": 401,
+        "wrongKeyStatus": 401,
+        "noKeyStreamStatus": 401,
+        "noKeyPostStatus": 401,
+        "validKeyStatus": 200
       }
     }
   ]

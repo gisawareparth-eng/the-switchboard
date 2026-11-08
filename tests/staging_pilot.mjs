@@ -3,12 +3,13 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 
 const SWITCHBOARD_URL = process.env.SWITCHBOARD_URL || 'http://localhost:3000';
+const BRIDGE_KEY = process.env.BRIDGE_KEY || 'bry_f704515bcae1aa2ef9d1a240c33468d3';
 const MOCK_PORT = 4001;
 
 async function runStagingPilot() {
   const TEST_AGENT = 'pilot-' + Math.random().toString(36).substring(2, 7);
   console.log('=======================================================');
-  console.log(`🚀 STARTING SWITCHBOARD v2.6.10 STAGING PILOT SUITE (${TEST_AGENT})`);
+  console.log(`🚀 STARTING SWITCHBOARD v2.6.11 STAGING PILOT SUITE (${TEST_AGENT})`);
   console.log(`Target Switchboard: ${SWITCHBOARD_URL}`);
   console.log('=======================================================\n');
 
@@ -108,7 +109,10 @@ async function runStagingPilot() {
     receivedEvents.length = 0;
     await fetch(`${SWITCHBOARD_URL}/api/message`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Bridge-Key': BRIDGE_KEY
+      },
       body: JSON.stringify({
         from: 'antigravity',
         to: TEST_AGENT,
@@ -149,7 +153,10 @@ async function runStagingPilot() {
     const isolateMsgId = 'iso_' + Date.now();
     await fetch(`${SWITCHBOARD_URL}/api/message`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Bridge-Key': BRIDGE_KEY
+      },
       body: JSON.stringify({
         from: 'antigravity',
         to: 'unrelated-bot',
@@ -179,7 +186,10 @@ async function runStagingPilot() {
     receivedEvents.length = 0;
     await fetch(`${SWITCHBOARD_URL}/api/message`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Bridge-Key': BRIDGE_KEY
+      },
       body: JSON.stringify({
         from: 'antigravity',
         to: TEST_AGENT,
@@ -197,7 +207,9 @@ async function runStagingPilot() {
 
     // TEST 6: Public Endpoint Sanitization (Zero Secret Exposure)
     console.log('\n[Test 6] Testing Public Audit Sanitization...');
-    const listRes = await fetch(`${SWITCHBOARD_URL}/api/webhooks`);
+    const listRes = await fetch(`${SWITCHBOARD_URL}/api/webhooks`, {
+      headers: { 'X-Bridge-Key': BRIDGE_KEY }
+    });
     const listData = await listRes.json();
     const botEntry = listData.webhooks.find(w => w.agent === TEST_AGENT);
     const test6Pass = botEntry && !botEntry.url && !botEntry.challenge && !botEntry.signingSecret && !botEntry.authHeader;
@@ -208,11 +220,11 @@ async function runStagingPilot() {
     });
     console.log(`[Test 6] Sanitized Auditing Result: ${test6Pass ? '✅ PASS' : '❌ FAIL'}`);
 
-    // TEST 7: Version Alignment (/api/health reports 2.6.10 matching /api/docs)
-    console.log('\n[Test 7] Testing System Version Alignment (/api/health == 2.6.10)...');
+    // TEST 7: Version Alignment (/api/health reports 2.6.11 matching /api/docs)
+    console.log('\n[Test 7] Testing System Version Alignment (/api/health == 2.6.11)...');
     const healthRes = await fetch(`${SWITCHBOARD_URL}/api/health`);
     const healthData = await healthRes.json();
-    const test7Pass = healthRes.status === 200 && healthData.version === '2.6.10';
+    const test7Pass = healthRes.status === 200 && healthData.version === '2.6.11';
     results.push({
       test: 'VersionAlignment_HealthAndDocs',
       pass: test7Pass,
@@ -273,7 +285,10 @@ async function runStagingPilot() {
     const sensitiveMsg = 'CONFIDENTIAL_PAYLOAD_CONTENT_' + Date.now();
     await fetch(`${SWITCHBOARD_URL}/api/message`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Bridge-Key': BRIDGE_KEY
+      },
       body: JSON.stringify({
         from: 'antigravity',
         to: PRIVACY_AGENT,
@@ -300,6 +315,38 @@ async function runStagingPilot() {
     });
     console.log(`[Test 9] Privacy Mode Result: ${test9Pass ? '✅ PASS' : '❌ FAIL'} (Text Omitted: ${!hasText}, Mode: ${privDispatchEvent?.payload?.payloadMode})`);
 
+    // TEST 10: Strict Authentication Guard on Operational Endpoints (Zero Loopback/Tunnel Bypass)
+    console.log('\n[Test 10] Testing Strict Auth Guard on Operational Endpoints (Rejecting Missing/Wrong Key)...');
+    const noKeyRes = await fetch(`${SWITCHBOARD_URL}/api/messages`);
+    const wrongKeyRes = await fetch(`${SWITCHBOARD_URL}/api/messages?key=invalid_bad_key`);
+    const noKeyStreamRes = await fetch(`${SWITCHBOARD_URL}/api/stream`);
+    const noKeyPostRes = await fetch(`${SWITCHBOARD_URL}/api/message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: 'attacker', to: 'all', text: 'unauthorized post' })
+    });
+    const validKeyRes = await fetch(`${SWITCHBOARD_URL}/api/messages?key=bry_f704515bcae1aa2ef9d1a240c33468d3`);
+
+    const test10Pass = 
+      noKeyRes.status === 401 &&
+      wrongKeyRes.status === 401 &&
+      noKeyStreamRes.status === 401 &&
+      noKeyPostRes.status === 401 &&
+      validKeyRes.status === 200;
+
+    results.push({
+      test: 'StrictAuthGuard_ZeroLoopbackBypass',
+      pass: test10Pass,
+      details: {
+        noKeyStatus: noKeyRes.status,
+        wrongKeyStatus: wrongKeyRes.status,
+        noKeyStreamStatus: noKeyStreamRes.status,
+        noKeyPostStatus: noKeyPostRes.status,
+        validKeyStatus: validKeyRes.status
+      }
+    });
+    console.log(`[Test 10] Strict Auth Result: ${test10Pass ? '✅ PASS' : '❌ FAIL'} (No-Key: ${noKeyRes.status}, Wrong-Key: ${wrongKeyRes.status}, Valid: ${validKeyRes.status})`);
+
   } finally {
     mockServer.close();
   }
@@ -311,7 +358,7 @@ async function runStagingPilot() {
   console.log('=======================================================\n');
 
   const evidenceReport = {
-    suite: 'Switchboard_v2.6.10_ProbeChallenge_Pilot',
+    suite: 'Switchboard_v2.6.11_ProbeChallenge_Pilot',
     timestamp: new Date().toISOString(),
     targetUrl: SWITCHBOARD_URL,
     allPassed,

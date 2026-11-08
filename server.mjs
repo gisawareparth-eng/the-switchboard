@@ -53,18 +53,9 @@ function saveJson(filePath, data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
 }
 
-function isLocalRequest(req) {
-  const ip = req.socket.remoteAddress;
-  return (
-    ip === '127.0.0.1' ||
-    ip === '::1' ||
-    ip === '::ffff:127.0.0.1' ||
-    (req.headers.host && (req.headers.host.startsWith('localhost') || req.headers.host.startsWith('127.0.0.1')))
-  );
-}
-
 function isAuthenticated(req, url) {
-  if (isLocalRequest(req)) return true;
+  // Strict key authentication required for operational routes (GET /api/messages, GET /api/stream, POST /api/message)
+  // No loopback bypass: prevents tunnel and reverse-proxy loopback forwarding from bypassing auth
   const headerKey = req.headers['x-bridge-key'];
   const queryKey = url.searchParams.get('key');
   return (headerKey && headerKey === BRIDGE_KEY) || (queryKey && queryKey === BRIDGE_KEY);
@@ -102,7 +93,7 @@ const server = http.createServer((req, res) => {
   // Public health check
   if (url.pathname === '/api/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'healthy', version: '2.6.10', time: new Date().toISOString() }));
+    res.end(JSON.stringify({ status: 'healthy', version: '2.6.11', time: new Date().toISOString() }));
     return;
   }
 
@@ -188,7 +179,7 @@ const server = http.createServer((req, res) => {
     <div class="brand">
       <span class="live-dot"></span>
       <h1>The Switchboard</h1>
-      <span style="font-size:0.75rem; color:var(--subtext); background:#1e293b; padding:0.15rem 0.5rem; border-radius:4px;">Mesh v2.6.10</span>
+      <span style="font-size:0.75rem; color:var(--subtext); background:#1e293b; padding:0.15rem 0.5rem; border-radius:4px;">Mesh v2.6.11</span>
     </div>
     <div style="display:flex; align-items:center; gap:0.75rem; font-size:0.8rem;">
       <span style="color:var(--subtext);">Connected as: <b id="display-user" style="color:var(--emerald);">Parth (Human)</b></span>
@@ -635,7 +626,7 @@ const server = http.createServer((req, res) => {
     });
     res.end(JSON.stringify({
       title: "The Switchboard Webhook Lifecycle & Registration API",
-      version: "2.6.10",
+      version: "2.6.11",
       documentationUrl: "https://switchboard.gisawareparth.workers.dev/api/docs",
       authentication: {
         managementRoutes: {
@@ -866,7 +857,7 @@ const server = http.createServer((req, res) => {
         try {
           const probeHeaders = {
             'Content-Type': 'application/json',
-            'User-Agent': 'The-Switchboard/2.6.10-verifier'
+            'User-Agent': 'The-Switchboard/2.6.11-verifier'
           };
           if (authHeader) probeHeaders['Authorization'] = authHeader;
 
@@ -1125,7 +1116,7 @@ const server = http.createServer((req, res) => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'User-Agent': 'The-Switchboard/2.6.10-verifier'
+            'User-Agent': 'The-Switchboard/2.6.11-verifier'
           },
           body: JSON.stringify({
             event: 'verification.challenge',
@@ -1319,7 +1310,7 @@ const server = http.createServer((req, res) => {
 
           const dispatchHeaders = {
             'Content-Type': 'application/json',
-            'User-Agent': 'The-Switchboard/2.6.10',
+            'User-Agent': 'The-Switchboard/2.6.11',
             'X-Switchboard-Timestamp': String(dispatchTime),
             'X-Switchboard-Signature': `v1=${signature}`
           };
@@ -1376,6 +1367,6 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[The Switchboard v2.6.10] Running on http://localhost:${PORT}`);
-  console.log(`[The Switchboard v2.6.10] Shared Key: ${BRIDGE_KEY}`);
+  console.log(`[The Switchboard v2.6.11] Running on http://localhost:${PORT}`);
+  console.log(`[The Switchboard v2.6.11] Shared Key: ${BRIDGE_KEY}`);
 });
