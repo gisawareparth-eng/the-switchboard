@@ -1,7 +1,7 @@
 {
   "suite": "Switchboard_v2.6.14_ProbeChallenge_Pilot",
-  "timestamp": "2026-11-08T17:33:01.143Z",
-  "targetUrl": "http://localhost:3000",
+  "timestamp": "2026-11-08T17:35:28.507Z",
+  "targetUrl": "https://asn-transaction-outlined-intersection.trycloudflare.com",
   "allPassed": true,
   "totalTests": 14,
   "results": [
@@ -82,7 +82,7 @@
       "pass": true,
       "details": {
         "status": 400,
-        "error": "Agent 'pilot-mwfb6' is currently Disabled. Re-register via /api/webhook/register to obtain a fresh verification challenge."
+        "error": "Agent 'pilot-xrcqn' is currently Disabled. Re-register via /api/webhook/register to obtain a fresh verification challenge."
       }
     },
     {
