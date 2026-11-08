@@ -1,7 +1,7 @@
 # The Switchboard • Operational Handover & System Context
 
-**Document Version:** 2.6.11  
-**Generated At:** 2026-11-08T22:36:00+05:30 (Local) / 17:06:00 UTC  
+**Document Version:** 2.6.13  
+**Generated At:** 2026-11-08T22:56:00+05:30 (Local) / 17:26:00 UTC  
 **Workspaces:** `c:\Users\Hp\Desktop\isthumus` (local project) & `C:\Users\Hp\Desktop\the-switchboard` (git repo)  
 **Host / Owner:** Parth (`Parth (Human)`)  
 **Lead Pair-Programmer / Author:** Antigravity  
@@ -36,7 +36,7 @@ The system provides instant sub-100ms push dispatches via Webhook Triggers, Serv
                                   │
                                   ▼
                    [ The Switchboard Node.js Engine ]
-                     http://localhost:3000 (v2.6.11)
+                     http://localhost:3000 (v2.6.13)
                                   │
         ┌─────────────────────────┼─────────────────────────┐
         ▼                         ▼                         ▼
@@ -48,7 +48,7 @@ The system provides instant sub-100ms push dispatches via Webhook Triggers, Serv
 - **Permanent Cloudflare Worker:** `https://switchboard.gisawareparth.workers.dev`
 - **Active Public Cloudflare Tunnel:** `https://asn-transaction-outlined-intersection.trycloudflare.com`
 - **Local Engine Port:** `http://localhost:3000`
-- **Public Health Check:** `GET /api/health` -> `{"status":"healthy","version":"2.6.11"}`
+- **Public Health Check:** `GET /api/health` -> `{"status":"healthy","version":"2.6.13"}`
 - **Self-Documenting OpenAPI/Docs:** `GET /api/docs` (Unauthenticated, returns complete schema)
 - **Public Audit Receipts:** `GET /api/webhook/receipts` (Non-sensitive activation audit)
 - **Message Send Endpoint:** `POST /api/message` (Strict key auth: `X-Bridge-Key` or `?key=`)
@@ -60,7 +60,7 @@ The system provides instant sub-100ms push dispatches via Webhook Triggers, Serv
 
 - **URL:** [`https://github.com/gisawareparth-eng/the-switchboard`](https://github.com/gisawareparth-eng/the-switchboard)
 - **Local Git Clone:** `C:\Users\Hp\Desktop\the-switchboard` (on `main`)
-- **Canonical Release Commit:** [`f492cc3`](https://github.com/gisawareparth-eng/the-switchboard/commit/f492cc3) (`fix(security): Switchboard v2.6.11 with strict operational auth and loopback bypass elimination`)
+- **Canonical Release Commit:** [`407c1f8`](https://github.com/gisawareparth-eng/the-switchboard/commit/407c1f8) (`feat(security): Switchboard v2.6.13 with 13-test staging suite, broadcast suppression, replay guard, and private-IP SSRF protection`)
 - **Zero-Secrets Policy:** `.gitignore` strictly protects `bridge_key.txt`, `webhook_config.json`, `chat_history.json`, `inbox.json`, `.env`, `node_modules/`, and logs. All automated leak audits passed 0 leaks.
 
 ---
