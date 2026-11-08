@@ -200,7 +200,7 @@ async function runStagingPilot() {
     console.log('\n[Test 5] Testing One-Step Kill Switch & Revision Increment...');
     const disRes = await fetch(`${SWITCHBOARD_URL}/api/webhook/disable`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Bridge-Key': BRIDGE_KEY },
       body: JSON.stringify({ agent: TEST_AGENT })
     });
     const disData = await disRes.json();
@@ -348,7 +348,7 @@ async function runStagingPilot() {
     // Cleanup privacy test agent
     await fetch(`${SWITCHBOARD_URL}/api/webhook/disable`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Bridge-Key': BRIDGE_KEY },
       body: JSON.stringify({ agent: PRIVACY_AGENT })
     });
 

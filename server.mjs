@@ -1127,6 +1127,15 @@ const server = http.createServer((req, res) => {
           return;
         }
 
+        // Ownership proof required: the agent's current signingSecret or the master key
+        const hasProof = payload.previousSecret && dest.signingSecret && payload.previousSecret === dest.signingSecret;
+        const hasMasterKey = req.headers['x-bridge-key'] === BRIDGE_KEY;
+        if (!hasProof && !hasMasterKey) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: `Ownership proof required to disable '${agentName}'. Provide 'previousSecret' or the master X-Bridge-Key.` }));
+          return;
+        }
+
         dest.status = 'Disabled';
         dest.revision = (dest.revision || 1) + 1;
         dest.disabledAt = Date.now();
@@ -1183,6 +1192,17 @@ const server = http.createServer((req, res) => {
         const cfg = getWebhookConfig();
         if (!cfg.destinations) cfg.destinations = {};
         const dest = cfg.destinations[agentName] || {};
+
+        // Ownership proof required: if alias exists, require previousSecret or master key
+        if (dest && (dest.status === 'Active' || dest.signingSecret)) {
+          const hasProof = payload.previousSecret && dest.signingSecret && payload.previousSecret === dest.signingSecret;
+          const hasMasterKey = req.headers['x-bridge-key'] === BRIDGE_KEY;
+          if (!hasProof && !hasMasterKey) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: `Ownership proof required to rotate '${agentName}'. Provide 'previousSecret' or the master X-Bridge-Key.` }));
+            return;
+          }
+        }
         const revision = (dest.revision || 1) + 1;
         const challenge = crypto.randomBytes(16).toString('hex');
         const signingSecret = crypto.randomBytes(32).toString('hex');
