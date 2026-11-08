@@ -1,0 +1,112 @@
+{
+  "sol": {
+    "name": "Sol",
+    "email": "sol869@bot.cue.im",
+    "role": "Coordinator for Sol's 20 specialist agents."
+  },
+  "research-scout": {
+    "name": "Research Scout",
+    "email": "research-scout-6mjyou@bot.cue.im",
+    "role": "Deep research, source verification, and intelligence gathering."
+  },
+  "task-planner": {
+    "name": "Task Planner",
+    "email": "task-planner-y0tbwf@bot.cue.im",
+    "role": "Goal decomposition, milestone tracking, and task priority."
+  },
+  "writing-specialist": {
+    "name": "Writing Specialist",
+    "email": "writing-specialist-khmeqb@bot.cue.im",
+    "role": "Clear requirements, documentation, and user-facing copy."
+  },
+  "editor": {
+    "name": "Editor",
+    "email": "editor-12ypbx@bot.cue.im",
+    "role": "Copyediting, consistency review, and narrative polish."
+  },
+  "data-analyst": {
+    "name": "Data Analyst",
+    "email": "data-analyst-0ioq7b@bot.cue.im",
+    "role": "Quantitative metrics, dataset analysis, and performance tracking."
+  },
+  "software-builder": {
+    "name": "Software Builder",
+    "email": "software-builder-ylthj4@bot.cue.im",
+    "role": "Implementation, feature scaffolding, and code generation."
+  },
+  "qa-reviewer": {
+    "name": "QA Reviewer",
+    "email": "qa-reviewer-gukcua@bot.cue.im",
+    "role": "Quality assurance, unit/integration testing, and regression analysis."
+  },
+  "operations-coordinator": {
+    "name": "Operations Coordinator",
+    "email": "operations-coordinator-rdqocc@bot.cue.im",
+    "role": "Workflow execution, coordination, and operational integrity."
+  },
+  "automation-designer": {
+    "name": "Automation Designer",
+    "email": "automation-designer-vuxmnc@bot.cue.im",
+    "role": "Event triggers, integrations, and workflow automation."
+  },
+  "knowledge-curator": {
+    "name": "Knowledge Curator",
+    "email": "knowledge-curator-ziyxkx@bot.cue.im",
+    "role": "Knowledge organization, taxonomy, and documentation archival."
+  },
+  "scheduling-coordinator": {
+    "name": "Scheduling Coordinator",
+    "email": "scheduling-coordinator-irw5qj@bot.cue.im",
+    "role": "Time management, calendar coordination, and meeting logistics."
+  },
+  "email-drafter": {
+    "name": "Email Drafter",
+    "email": "email-drafter-gvgdf3@bot.cue.im",
+    "role": "Concise, audience-aware email copy and response formulation."
+  },
+  "communications-coach": {
+    "name": "Communications Coach",
+    "email": "communications-coach-q7mggh@bot.cue.im",
+    "role": "Inter-agent comms alignment, tone calibration, and clarity coaching."
+  },
+  "visual-designer": {
+    "name": "Visual Designer",
+    "email": "visual-designer-hyafh4@bot.cue.im",
+    "role": "UI/UX layouts, wireframes, and creative design briefs."
+  },
+  "budget-organizer": {
+    "name": "Budget Organizer",
+    "email": "budget-organizer-5mpsoj@bot.cue.im",
+    "role": "Financial planning, resource budgeting, and cost optimization."
+  },
+  "travel-planner": {
+    "name": "Travel Planner",
+    "email": "travel-planner-bdg3d0@bot.cue.im",
+    "role": "Travel itineraries, route planning, and logistics."
+  },
+  "product-researcher": {
+    "name": "Product Researcher",
+    "email": "product-researcher-2q8yzp@bot.cue.im",
+    "role": "Competitive analysis, market research, and feature discovery."
+  },
+  "learning-coach": {
+    "name": "Learning Coach",
+    "email": "learning-coach-uz2wz0@bot.cue.im",
+    "role": "Subject conceptualization, tutorials, and knowledge onboarding."
+  },
+  "risk-reviewer": {
+    "name": "Risk Reviewer",
+    "email": "risk-reviewer-718d4e@bot.cue.im",
+    "role": "Risk identification, failure-mode analysis, and mitigation plans."
+  },
+  "idea-strategist": {
+    "name": "Idea Strategist",
+    "email": "idea-strategist-xu6zfa@bot.cue.im",
+    "role": "Ideation, assumption testing, and strategic experiments."
+  },
+  "instinct": {
+    "name": "Instinct",
+    "email": "g3lguk@mail.instinct.com",
+    "role": "Parth's primary assistant, task execution, and project testing."
+  }
+}

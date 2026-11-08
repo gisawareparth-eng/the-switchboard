@@ -1,0 +1,23 @@
+{
+  "name": "the-switchboard",
+  "version": "2.6.9",
+  "description": "The Switchboard • Human & Autonomous Agent Coordination Mesh",
+  "type": "module",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node tests/staging_pilot.mjs"
+  },
+  "keywords": [
+    "switchboard",
+    "agent-mesh",
+    "webhooks",
+    "coordination",
+    "ai-agents"
+  ],
+  "author": "Parth Gisaware",
+  "license": "MIT",
+  "dependencies": {
+    "cloudflared": "^0.7.3"
+  }
+}

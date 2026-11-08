@@ -1,0 +1,63 @@
+{
+  "suite": "Switchboard_v2.6.0_ProbeChallenge_Pilot",
+  "timestamp": "2026-11-08T14:38:09.955Z",
+  "targetUrl": "https://switchboard.gisawareparth.workers.dev",
+  "allPassed": true,
+  "totalTests": 6,
+  "results": [
+    {
+      "test": "OutboundProbeChallenge_NonceOnly_NoSecretLeak",
+      "pass": true,
+      "details": {
+        "registrationStatus": "Pending",
+        "nonceLeakedInResponse": false,
+        "probeReceivedAtEndpoint": true,
+        "probeHasNoSecret": true,
+        "challengeProvidedInProbe": true
+      }
+    },
+    {
+      "test": "OwnershipVerification_ActiveState_SecretHandover",
+      "pass": true,
+      "details": {
+        "status": "Active",
+        "revision": 1,
+        "secretIssuedOnActivation": true
+      }
+    },
+    {
+      "test": "CryptographicSignatureAndReplayGuard",
+      "pass": true,
+      "details": {
+        "received": true,
+        "hasTimestamp": true,
+        "signatureValid": true
+      }
+    },
+    {
+      "test": "RoutingIsolation_ZeroLeakToNonRecipient",
+      "pass": true,
+      "details": {
+        "leakedCount": 0
+      }
+    },
+    {
+      "test": "KillSwitch_AtomicPreDispatchAbort",
+      "pass": true,
+      "details": {
+        "status": "Disabled",
+        "revision": 2,
+        "receivedAfterDisable": 0
+      }
+    },
+    {
+      "test": "SecurityAudit_ZeroSecretInPublicApi",
+      "pass": true,
+      "details": {
+        "entryFound": true,
+        "urlExposed": false,
+        "secretExposed": false
+      }
+    }
+  ]
+}

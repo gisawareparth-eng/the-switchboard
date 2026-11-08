@@ -1,0 +1,8 @@
+bridge_key.txt
+webhook_config.json
+.env
+chat_history.json
+inbox.json
+tunnel_url.txt
+node_modules/
+*.log
