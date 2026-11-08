@@ -36,7 +36,7 @@ const checkInterval = setInterval(() => {
   const currentMsgs = getMessages();
   for (const msg of currentMsgs) {
     if (!initialIds.has(msg.id)) {
-      if (msg.from !== 'agent' && msg.from !== 'antigravity' && msg.from !== 'antigravity-2') {
+      if (msg.from !== 'antigravity' && msg.from !== 'antigravity-2') {
         clearInterval(checkInterval);
         console.log(`\n========================================`);
         console.log(`🔔 NEW SWITCHBOARD MESSAGE FROM [${msg.from}]`);
@@ -80,4 +80,4 @@ const checkInterval = setInterval(() => {
       process.exit(0);
     }
   }
-}, 1000);
+}, 500);

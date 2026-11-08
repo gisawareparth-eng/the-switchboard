@@ -1191,17 +1191,21 @@ const server = http.createServer((req, res) => {
 
         const cfg = getWebhookConfig();
         if (!cfg.destinations) cfg.destinations = {};
-        const dest = cfg.destinations[agentName] || {};
+        const dest = cfg.destinations[agentName];
 
-        // Ownership proof required: if alias exists, require previousSecret or master key
-        if (dest && (dest.status === 'Active' || dest.signingSecret)) {
-          const hasProof = payload.previousSecret && dest.signingSecret && payload.previousSecret === dest.signingSecret;
-          const hasMasterKey = req.headers['x-bridge-key'] === BRIDGE_KEY;
-          if (!hasProof && !hasMasterKey) {
-            res.writeHead(403, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: `Ownership proof required to rotate '${agentName}'. Provide 'previousSecret' or the master X-Bridge-Key.` }));
-            return;
-          }
+        if (!dest) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: `Destination '${agentName}' does not exist. Use /api/webhook/register to register.` }));
+          return;
+        }
+
+        // Ownership proof strictly required for all rotations
+        const hasProof = payload.previousSecret && dest.signingSecret && payload.previousSecret === dest.signingSecret;
+        const hasMasterKey = req.headers['x-bridge-key'] === BRIDGE_KEY;
+        if (!hasProof && !hasMasterKey) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: `Ownership proof required to rotate '${agentName}'. Provide 'previousSecret' or the master X-Bridge-Key.` }));
+          return;
         }
         const revision = (dest.revision || 1) + 1;
         const challenge = crypto.randomBytes(16).toString('hex');
