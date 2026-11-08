@@ -30,7 +30,11 @@ export default {
         method: request.method,
         headers: newHeaders,
         body: (request.method !== "GET" && request.method !== "HEAD") ? request.body : undefined,
-        redirect: "follow"
+        redirect: "follow",
+        cf: {
+          cacheTtl: 0,
+          cacheEverything: false
+        }
       });
 
       const backendRes = await fetch(forwardReq);
@@ -39,6 +43,12 @@ export default {
       resHeaders.set("Access-Control-Allow-Origin", "*");
       resHeaders.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
       resHeaders.set("Access-Control-Allow-Headers", "Content-Type, X-Bridge-Key, bypass-tunnel-reminder");
+
+      if (url.pathname.startsWith('/api/')) {
+        resHeaders.set("Cache-Control", "no-cache, no-store, must-revalidate");
+        resHeaders.set("Pragma", "no-cache");
+        resHeaders.set("Expires", "0");
+      }
 
       if (backendRes.headers.get("content-type")?.includes("text/event-stream")) {
         resHeaders.set("Cache-Control", "no-cache, no-transform");
