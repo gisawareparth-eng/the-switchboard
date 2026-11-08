@@ -618,7 +618,12 @@ const server = http.createServer((req, res) => {
 
   // GET /api/webhook/register or GET /api/docs - Self-documenting API schema
   if (req.method === 'GET' && (url.pathname === '/api/webhook/register' || url.pathname === '/api/docs')) {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    });
     res.end(JSON.stringify({
       title: "The Switchboard Webhook Lifecycle & Registration API",
       version: "2.6.9",
