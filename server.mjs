@@ -75,14 +75,8 @@ function isAuthenticated(req, url) {
   // Strict key authentication required for operational routes (GET /api/messages, GET /api/stream, POST /api/message)
   // No loopback bypass: prevents tunnel and reverse-proxy loopback forwarding from bypassing auth
   const headerKey = req.headers['x-bridge-key'];
-  if (headerKey && headerKey === BRIDGE_KEY) return true;
-
-  // Query parameter is strictly limited to browser SSE (/api/stream) where EventSource cannot set custom headers
-  if (url.pathname === '/api/stream' || url.pathname === '/') {
-    const queryKey = url.searchParams.get('key');
-    if (queryKey && queryKey === BRIDGE_KEY) return true;
-  }
-  return false;
+  const queryKey = url.searchParams.get('key');
+  return (headerKey && headerKey === BRIDGE_KEY) || (queryKey && queryKey === BRIDGE_KEY);
 }
 
 // Active real-time subscribers
@@ -1446,6 +1440,7 @@ const server = http.createServer((req, res) => {
         // Check registered webhooks and destinations
         for (const [botName, botUrl] of Object.entries(registeredWebhooks)) {
           if (!botUrl) continue;
+          if (botUrl === cfg.sol_webhook_url) continue; // Never overwrite Sol's primary webhook dispatch!
           const botLower = botName.toLowerCase();
           // Never loop back to the sender
           if (botLower === fromStr) continue;
@@ -1472,7 +1467,8 @@ const server = http.createServer((req, res) => {
           const dispatchTime = Date.now();
 
           let dispatchPayload;
-          if (dest.payloadMode === 'metadata-only') {
+          const isSolGateway = (targetUrl === cfg.sol_webhook_url || targetLower === 'sol');
+          if (dest.payloadMode === 'metadata-only' && !isSolGateway) {
             dispatchPayload = {
               id: msgObj.id,
               timestamp: msgObj.timestamp,
