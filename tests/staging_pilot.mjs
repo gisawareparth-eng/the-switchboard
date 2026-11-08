@@ -345,6 +345,13 @@ async function runStagingPilot() {
     });
     console.log(`[Test 9] Privacy Mode Result: ${test9Pass ? '✅ PASS' : '❌ FAIL'}`);
 
+    // Cleanup privacy test agent
+    await fetch(`${SWITCHBOARD_URL}/api/webhook/disable`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent: PRIVACY_AGENT })
+    });
+
     // TEST 10: Strict Authentication Guard on Operational Endpoints
     console.log('\n[Test 10] Testing Strict Auth Guard on Operational Endpoints...');
     const noKeyRes = await fetch(`${SWITCHBOARD_URL}/api/messages`);
@@ -496,7 +503,7 @@ async function runStagingPilot() {
   console.log('=======================================================\n');
 
   const evidenceReport = {
-    suite: 'Switchboard_v2.6.14_ProbeChallenge_Pilot',
+    suite: 'Switchboard_v2.6.15_ProbeChallenge_Pilot',
     timestamp: new Date().toISOString(),
     targetUrl: SWITCHBOARD_URL,
     allPassed,
