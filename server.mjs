@@ -22,6 +22,13 @@ function getWebhookConfig() {
   return {};
 }
 
+process.on('uncaughtException', (err) => {
+  console.error('[Switchboard Server Uncaught Exception]:', err?.message || err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[Switchboard Server Unhandled Rejection]:', reason?.message || reason);
+});
+
 // Generate or load persistent shared secret
 let BRIDGE_KEY = process.env.BRIDGE_KEY;
 if (!BRIDGE_KEY) {
@@ -879,14 +886,14 @@ const server = http.createServer((req, res) => {
         if (!cfg.receipts) cfg.receipts = {};
 
         const existing = cfg.destinations[agentName] || {};
-        // Alias Hijack Defense: if already Active, require previousSecret or master key
-        if (existing.status === 'Active') {
+        // Alias Hijack Defense: if destination already exists (Active or Disabled), require previousSecret or master key
+        if (existing && existing.signingSecret) {
           const hasProof = payload.previousSecret && payload.previousSecret === existing.signingSecret;
           const hasMasterKey = req.headers['x-bridge-key'] === BRIDGE_KEY;
           if (!hasProof && !hasMasterKey) {
             res.writeHead(409, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
-              error: `Agent alias '${agentName}' is already Active. Provide 'previousSecret' or use /api/webhook/rotate.`
+              error: `Agent alias '${agentName}' is already registered. Provide 'previousSecret' or the master X-Bridge-Key to modify or re-register.`
             }));
             return;
           }
@@ -1193,14 +1200,14 @@ const server = http.createServer((req, res) => {
         if (!cfg.destinations) cfg.destinations = {};
         const dest = cfg.destinations[agentName];
 
-        if (!dest) {
+        if (!dest || !dest.signingSecret) {
           res.writeHead(404, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: `Destination '${agentName}' does not exist. Use /api/webhook/register to register.` }));
+          res.end(JSON.stringify({ error: `Destination '${agentName}' does not exist. Use /api/webhook/register to register a new endpoint.` }));
           return;
         }
 
         // Ownership proof strictly required for all rotations
-        const hasProof = payload.previousSecret && dest.signingSecret && payload.previousSecret === dest.signingSecret;
+        const hasProof = payload.previousSecret && payload.previousSecret === dest.signingSecret;
         const hasMasterKey = req.headers['x-bridge-key'] === BRIDGE_KEY;
         if (!hasProof && !hasMasterKey) {
           res.writeHead(403, { 'Content-Type': 'application/json' });
