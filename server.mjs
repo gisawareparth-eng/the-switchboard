@@ -102,7 +102,7 @@ const server = http.createServer((req, res) => {
   // Public health check
   if (url.pathname === '/api/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'healthy', version: '2.5.0-human-cockpit', time: new Date().toISOString() }));
+    res.end(JSON.stringify({ status: 'healthy', version: '2.6.10', time: new Date().toISOString() }));
     return;
   }
 
@@ -188,7 +188,7 @@ const server = http.createServer((req, res) => {
     <div class="brand">
       <span class="live-dot"></span>
       <h1>The Switchboard</h1>
-      <span style="font-size:0.75rem; color:var(--subtext); background:#1e293b; padding:0.15rem 0.5rem; border-radius:4px;">Mesh v2.5</span>
+      <span style="font-size:0.75rem; color:var(--subtext); background:#1e293b; padding:0.15rem 0.5rem; border-radius:4px;">Mesh v2.6.10</span>
     </div>
     <div style="display:flex; align-items:center; gap:0.75rem; font-size:0.8rem;">
       <span style="color:var(--subtext);">Connected as: <b id="display-user" style="color:var(--emerald);">Parth (Human)</b></span>
@@ -635,7 +635,7 @@ const server = http.createServer((req, res) => {
     });
     res.end(JSON.stringify({
       title: "The Switchboard Webhook Lifecycle & Registration API",
-      version: "2.6.9",
+      version: "2.6.10",
       documentationUrl: "https://switchboard.gisawareparth.workers.dev/api/docs",
       authentication: {
         managementRoutes: {
@@ -661,6 +661,7 @@ const server = http.createServer((req, res) => {
               agent: { type: "string", example: "writing-specialist" },
               url: { type: "string", format: "uri", example: "https://api.manus.im/api/webhook/triggers/<uuid>" },
               scope: { type: "string", enum: ["direct-only", "direct-and-broadcast"], default: "direct-and-broadcast" },
+              payloadMode: { type: "string", enum: ["full", "metadata-only"], default: "full", description: "Set to 'metadata-only' to omit message body text in dispatches for privacy in Cue Trigger run history previews." },
               authHeader: { type: "string", description: "Optional custom Authorization header Switchboard attaches when calling your webhook" },
               previousSecret: { type: "string", description: "Required only when re-registering an already Active agent alias" }
             }
@@ -786,6 +787,7 @@ const server = http.createServer((req, res) => {
         const agentName = (payload.agent || payload.name || '').trim().toLowerCase();
         const webhookUrl = (payload.url || payload.webhook || '').trim();
         const authHeader = payload.authHeader || null;
+        const payloadMode = (payload.payloadMode === 'metadata-only') ? 'metadata-only' : 'full';
 
         if (!agentName || !webhookUrl) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -832,6 +834,7 @@ const server = http.createServer((req, res) => {
           revision,
           scope,
           directOnly,
+          payloadMode,
           challenge,
           signingSecret,
           authHeader,
@@ -849,6 +852,7 @@ const server = http.createServer((req, res) => {
           status: 'Pending',
           revision,
           scope,
+          payloadMode,
           issuedAt: new Date().toISOString(),
           issuer: 'https://switchboard.gisawareparth.workers.dev',
           probeDispatched: true
@@ -862,7 +866,7 @@ const server = http.createServer((req, res) => {
         try {
           const probeHeaders = {
             'Content-Type': 'application/json',
-            'User-Agent': 'The-Switchboard/2.6.0-verifier'
+            'User-Agent': 'The-Switchboard/2.6.10-verifier'
           };
           if (authHeader) probeHeaders['Authorization'] = authHeader;
 
@@ -874,6 +878,7 @@ const server = http.createServer((req, res) => {
               agent: agentName,
               challenge,
               scope,
+              payloadMode,
               verifyEndpoint: 'https://switchboard.gisawareparth.workers.dev/api/webhook/verify',
               timestamp: Date.now()
             })
@@ -910,6 +915,7 @@ const server = http.createServer((req, res) => {
                   status: 'Active',
                   revision: d.revision,
                   scope: d.scope || 'direct-only',
+                  payloadMode: d.payloadMode || 'full',
                   activatedAt: new Date().toISOString(),
                   issuer: 'https://switchboard.gisawareparth.workers.dev'
                 };
@@ -932,6 +938,7 @@ const server = http.createServer((req, res) => {
             status: 'Active',
             revision,
             scope,
+            payloadMode,
             synchronousVerification: true,
             receipt: actReceipt,
             signingSecret,
@@ -946,6 +953,7 @@ const server = http.createServer((req, res) => {
             status: 'Pending',
             revision,
             scope,
+            payloadMode,
             probeDispatched: true,
             receipt: registrationReceipt,
             verifyEndpoint: 'https://switchboard.gisawareparth.workers.dev/api/webhook/verify',
@@ -978,9 +986,15 @@ const server = http.createServer((req, res) => {
           return;
         }
 
-        if (!challenge || dest.challenge !== challenge) {
+        if (dest.status === 'Disabled') {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: `Agent '${agentName}' is currently Disabled. Re-register via /api/webhook/register to obtain a fresh verification challenge.` }));
+          return;
+        }
+
+        if (!challenge || !dest.challenge || dest.challenge !== challenge) {
           res.writeHead(403, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Invalid or missing verification challenge nonce' }));
+          res.end(JSON.stringify({ error: 'Invalid, missing, or expired verification challenge nonce' }));
           return;
         }
 
@@ -1042,13 +1056,25 @@ const server = http.createServer((req, res) => {
         dest.status = 'Disabled';
         dest.revision = (dest.revision || 1) + 1;
         dest.disabledAt = Date.now();
+        dest.challenge = null; // Clear challenge to prevent replay reactivation
         if (cfg.webhooks) delete cfg.webhooks[agentName];
         if (agentName === 'sol') delete cfg.sol_webhook_url;
+
+        const disableReceipt = {
+          receiptId: 'rcpt_dis_' + Date.now() + '_' + crypto.randomBytes(4).toString('hex'),
+          agent: agentName,
+          status: 'Disabled',
+          revision: dest.revision,
+          disabledAt: new Date().toISOString(),
+          issuer: 'https://switchboard.gisawareparth.workers.dev'
+        };
+        if (!cfg.receipts) cfg.receipts = {};
+        cfg.receipts[agentName] = disableReceipt;
         fs.writeFileSync(WEBHOOK_FILE, JSON.stringify(cfg, null, 2), 'utf-8');
 
         console.log(`[Webhook] Disabled endpoint for [${agentName}] (status: Disabled, rev: ${dest.revision})`);
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, agent: agentName, status: 'Disabled', revision: dest.revision }));
+        res.end(JSON.stringify({ success: true, agent: agentName, status: 'Disabled', revision: dest.revision, receipt: disableReceipt }));
       } catch (err) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Invalid JSON: ' + err.message }));
@@ -1099,7 +1125,7 @@ const server = http.createServer((req, res) => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'User-Agent': 'The-Switchboard/2.6.0-verifier'
+            'User-Agent': 'The-Switchboard/2.6.10-verifier'
           },
           body: JSON.stringify({
             event: 'verification.challenge',
@@ -1270,12 +1296,30 @@ const server = http.createServer((req, res) => {
           const dest = destinations[targetLower] || {};
           const secret = dest.signingSecret || 'switchboard-default-secret';
           const dispatchTime = Date.now();
-          const bodyStr = JSON.stringify(webhookPayload);
+
+          let dispatchPayload;
+          if (dest.payloadMode === 'metadata-only') {
+            dispatchPayload = {
+              id: msgObj.id,
+              timestamp: msgObj.timestamp,
+              isoTime: msgObj.isoTime,
+              sender: from,
+              recipient: to,
+              type: 'direct_message',
+              payloadMode: 'metadata-only',
+              hub: 'https://switchboard.gisawareparth.workers.dev',
+              replyEndpoint: 'https://switchboard.gisawareparth.workers.dev/api/message'
+            };
+          } else {
+            dispatchPayload = webhookPayload;
+          }
+
+          const bodyStr = JSON.stringify(dispatchPayload);
           const signature = crypto.createHmac('sha256', secret).update(`${dispatchTime}.${bodyStr}`).digest('hex');
 
           const dispatchHeaders = {
             'Content-Type': 'application/json',
-            'User-Agent': 'The-Switchboard/2.6.0',
+            'User-Agent': 'The-Switchboard/2.6.10',
             'X-Switchboard-Timestamp': String(dispatchTime),
             'X-Switchboard-Signature': `v1=${signature}`
           };
@@ -1288,7 +1332,7 @@ const server = http.createServer((req, res) => {
             headers: dispatchHeaders,
             body: bodyStr
           })
-            .then(r => console.log(`[Webhook] Dispatched to ${targetName} (${r.status})`))
+            .then(r => console.log(`[Webhook] Dispatched to ${targetName} (${r.status}) [mode: ${dest.payloadMode || 'full'}]`))
             .catch(e => console.error(`[Webhook] Error dispatching to ${targetName}: ${e.message}`));
         }
 
@@ -1332,6 +1376,6 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[The Switchboard v2.5] Running on http://localhost:${PORT}`);
-  console.log(`[The Switchboard v2.5] Shared Key: ${BRIDGE_KEY}`);
+  console.log(`[The Switchboard v2.6.10] Running on http://localhost:${PORT}`);
+  console.log(`[The Switchboard v2.6.10] Shared Key: ${BRIDGE_KEY}`);
 });

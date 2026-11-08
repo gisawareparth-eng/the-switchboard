@@ -208,6 +208,98 @@ async function runStagingPilot() {
     });
     console.log(`[Test 6] Sanitized Auditing Result: ${test6Pass ? '✅ PASS' : '❌ FAIL'}`);
 
+    // TEST 7: Version Alignment (/api/health reports 2.6.10 matching /api/docs)
+    console.log('\n[Test 7] Testing System Version Alignment (/api/health == 2.6.10)...');
+    const healthRes = await fetch(`${SWITCHBOARD_URL}/api/health`);
+    const healthData = await healthRes.json();
+    const test7Pass = healthRes.status === 200 && healthData.version === '2.6.10';
+    results.push({
+      test: 'VersionAlignment_HealthAndDocs',
+      pass: test7Pass,
+      details: { status: healthRes.status, version: healthData.version }
+    });
+    console.log(`[Test 7] Version Alignment Result: ${test7Pass ? '✅ PASS' : '❌ FAIL'} (Version: ${healthData.version})`);
+
+    // TEST 8: Challenge Invalidation on Disable (Stale Challenge Replay Rejection)
+    console.log('\n[Test 8] Testing Stale Challenge Replay Rejection on Disabled Endpoint...');
+    const staleVerifyRes = await fetch(`${SWITCHBOARD_URL}/api/webhook/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        agent: TEST_AGENT,
+        challenge: receivedChallenge
+      })
+    });
+    const staleVerifyData = await staleVerifyRes.json();
+    const test8Pass = staleVerifyRes.status >= 400 && !staleVerifyData.success;
+    results.push({
+      test: 'ChallengeInvalidation_PreventsReactivation',
+      pass: test8Pass,
+      details: { status: staleVerifyRes.status, error: staleVerifyData.error }
+    });
+    console.log(`[Test 8] Replay Invalidation Result: ${test8Pass ? '✅ PASS' : '❌ FAIL'} (Status: ${staleVerifyRes.status})`);
+
+    // TEST 9: Metadata-Only Payload Privacy Mode (Cue Run Preview Protection)
+    console.log('\n[Test 9] Testing Metadata-Only Privacy Mode (Zero Message Body in Webhook)...');
+    const PRIVACY_AGENT = 'privacy-' + Math.random().toString(36).substring(2, 7);
+    receivedEvents.length = 0;
+
+    const privRegRes = await fetch(`${SWITCHBOARD_URL}/api/webhook/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        agent: PRIVACY_AGENT,
+        url: `http://localhost:${MOCK_PORT}/privacy-hook`,
+        scope: 'direct-only',
+        payloadMode: 'metadata-only'
+      })
+    });
+    const privRegData = await privRegRes.json();
+    await new Promise(r => setTimeout(r, 400));
+
+    const privProbeEvent = receivedEvents.find(e => e.payload && e.payload.agent === PRIVACY_AGENT);
+    const privChallenge = privProbeEvent?.payload?.challenge;
+
+    await fetch(`${SWITCHBOARD_URL}/api/webhook/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        agent: PRIVACY_AGENT,
+        challenge: privChallenge
+      })
+    });
+
+    receivedEvents.length = 0;
+    const sensitiveMsg = 'CONFIDENTIAL_PAYLOAD_CONTENT_' + Date.now();
+    await fetch(`${SWITCHBOARD_URL}/api/message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: 'antigravity',
+        to: PRIVACY_AGENT,
+        text: sensitiveMsg
+      })
+    });
+    await new Promise(r => setTimeout(r, 600));
+
+    const privDispatchEvent = receivedEvents.find(e => e.payload && e.payload.recipient === PRIVACY_AGENT);
+    const hasText = privDispatchEvent?.payload && Object.prototype.hasOwnProperty.call(privDispatchEvent.payload, 'text');
+    const test9Pass = !!privDispatchEvent &&
+      privDispatchEvent.payload.recipient === PRIVACY_AGENT &&
+      privDispatchEvent.payload.payloadMode === 'metadata-only' &&
+      !hasText;
+
+    results.push({
+      test: 'MetadataOnly_PayloadPrivacy_ZeroBodyLeak',
+      pass: test9Pass,
+      details: {
+        received: !!privDispatchEvent,
+        mode: privDispatchEvent?.payload?.payloadMode,
+        textOmitted: !hasText
+      }
+    });
+    console.log(`[Test 9] Privacy Mode Result: ${test9Pass ? '✅ PASS' : '❌ FAIL'} (Text Omitted: ${!hasText}, Mode: ${privDispatchEvent?.payload?.payloadMode})`);
+
   } finally {
     mockServer.close();
   }

@@ -1,9 +1,9 @@
 {
   "suite": "Switchboard_v2.6.0_ProbeChallenge_Pilot",
-  "timestamp": "2026-11-08T14:38:09.955Z",
-  "targetUrl": "https://switchboard.gisawareparth.workers.dev",
+  "timestamp": "2026-11-08T16:26:07.259Z",
+  "targetUrl": "http://localhost:3000",
   "allPassed": true,
-  "totalTests": 6,
+  "totalTests": 9,
   "results": [
     {
       "test": "OutboundProbeChallenge_NonceOnly_NoSecretLeak",
@@ -57,6 +57,31 @@
         "entryFound": true,
         "urlExposed": false,
         "secretExposed": false
+      }
+    },
+    {
+      "test": "VersionAlignment_HealthAndDocs",
+      "pass": true,
+      "details": {
+        "status": 200,
+        "version": "2.6.10"
+      }
+    },
+    {
+      "test": "ChallengeInvalidation_PreventsReactivation",
+      "pass": true,
+      "details": {
+        "status": 400,
+        "error": "Agent 'pilot-sgapo' is currently Disabled. Re-register via /api/webhook/register to obtain a fresh verification challenge."
+      }
+    },
+    {
+      "test": "MetadataOnly_PayloadPrivacy_ZeroBodyLeak",
+      "pass": true,
+      "details": {
+        "received": true,
+        "mode": "metadata-only",
+        "textOmitted": true
       }
     }
   ]
