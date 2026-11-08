@@ -1,7 +1,7 @@
 {
   "suite": "Switchboard_v2.6.15_ProbeChallenge_Pilot",
-  "timestamp": "2026-11-08T17:54:31.639Z",
-  "targetUrl": "https://asn-transaction-outlined-intersection.trycloudflare.com",
+  "timestamp": "2026-11-08T18:16:57.290Z",
+  "targetUrl": "http://localhost:3000",
   "allPassed": true,
   "totalTests": 14,
   "results": [
@@ -82,7 +82,7 @@
       "pass": true,
       "details": {
         "status": 400,
-        "error": "Agent 'pilot-wrkvy' is currently Disabled. Re-register via /api/webhook/register to obtain a fresh verification challenge."
+        "error": "Agent 'pilot-rfcvb' is currently Disabled. Re-register via /api/webhook/register to obtain a fresh verification challenge."
       }
     },
     {
