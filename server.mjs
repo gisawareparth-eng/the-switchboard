@@ -2,6 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import dns from 'node:dns';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -12,11 +13,21 @@ const KEY_FILE = path.join(__dirname, 'bridge_key.txt');
 const HISTORY_FILE = path.join(__dirname, 'chat_history.json');
 const INBOX_FILE = path.join(__dirname, 'inbox.json');
 const WEBHOOK_FILE = path.join(__dirname, 'webhook_config.json');
+const DIRECTORY_FILE = path.join(__dirname, 'agent_directory.json');
 
 function getWebhookConfig() {
   try {
     if (fs.existsSync(WEBHOOK_FILE)) {
       return JSON.parse(fs.readFileSync(WEBHOOK_FILE, 'utf-8'));
+    }
+  } catch {}
+  return {};
+}
+
+function getAgentDirectory() {
+  try {
+    if (fs.existsSync(DIRECTORY_FILE)) {
+      return JSON.parse(fs.readFileSync(DIRECTORY_FILE, 'utf-8'));
     }
   } catch {}
   return {};
@@ -64,8 +75,14 @@ function isAuthenticated(req, url) {
   // Strict key authentication required for operational routes (GET /api/messages, GET /api/stream, POST /api/message)
   // No loopback bypass: prevents tunnel and reverse-proxy loopback forwarding from bypassing auth
   const headerKey = req.headers['x-bridge-key'];
-  const queryKey = url.searchParams.get('key');
-  return (headerKey && headerKey === BRIDGE_KEY) || (queryKey && queryKey === BRIDGE_KEY);
+  if (headerKey && headerKey === BRIDGE_KEY) return true;
+
+  // Query parameter is strictly limited to browser SSE (/api/stream) where EventSource cannot set custom headers
+  if (url.pathname === '/api/stream' || url.pathname === '/') {
+    const queryKey = url.searchParams.get('key');
+    if (queryKey && queryKey === BRIDGE_KEY) return true;
+  }
+  return false;
 }
 
 // Active real-time subscribers
@@ -150,6 +167,37 @@ function isProhibitedDestination(req, webhookUrl) {
     if (!isStagingAuth) {
       return { prohibited: true, reason: 'Prohibited destination address (SSRF guard)' };
     }
+  }
+
+  return { prohibited: false };
+}
+
+async function isProhibitedDestinationAsync(req, webhookUrl) {
+  const syncCheck = isProhibitedDestination(req, webhookUrl);
+  if (syncCheck.prohibited) return syncCheck;
+
+  const isStagingAuth = (req.headers && req.headers['x-staging-test'] === 'true' && req.headers['x-bridge-key'] === BRIDGE_KEY);
+  if (isStagingAuth) return { prohibited: false };
+
+  try {
+    const parsed = new URL(webhookUrl);
+    const hostname = parsed.hostname.replace(/^\[|\]$/g, '');
+    const addresses = await dns.promises.lookup(hostname, { all: true });
+    for (const addr of addresses) {
+      const ip = addr.address;
+      if (ip === '127.0.0.1' || ip.startsWith('127.') || ip === '::1' || ip === '0.0.0.0' || ip === '::') {
+        return { prohibited: true, reason: 'Prohibited destination address (DNS resolved to loopback)' };
+      }
+      if (ip.startsWith('10.') || ip.startsWith('192.168.') || ip.startsWith('169.254.') || ip.startsWith('fe80:') || ip.startsWith('fc') || ip.startsWith('fd')) {
+        return { prohibited: true, reason: 'Prohibited destination address (DNS resolved to private/link-local)' };
+      }
+      const parts = ip.split('.').map(Number);
+      if (parts.length === 4 && parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) {
+        return { prohibited: true, reason: 'Prohibited destination address (DNS resolved to private network)' };
+      }
+    }
+  } catch (err) {
+    return { prohibited: true, reason: 'Unresolvable webhook destination address' };
   }
 
   return { prohibited: false };
@@ -262,8 +310,8 @@ const server = http.createServer((req, res) => {
     </div>
     <div style="display:flex; align-items:center; gap:0.75rem; font-size:0.8rem;">
       <span style="color:var(--subtext);">Connected as: <b id="display-user" style="color:var(--emerald);">Parth (Human)</b></span>
-      <span style="font-size:0.75rem; color:#94a3b8; background:#1e293b; padding:0.25rem 0.55rem; border-radius:6px; border:1px solid #334155; font-family:monospace;" id="key-badge">
-        Key: ${BRIDGE_KEY.slice(0, 8)}...
+      <span style="display:none; font-size:0.75rem; color:#94a3b8; background:#1e293b; padding:0.25rem 0.55rem; border-radius:6px; border:1px solid #334155; font-family:monospace;" id="key-badge">
+        Key: <span id="key-display-prefix"></span>
       </span>
       <button class="copy-btn" id="copy-key-btn" title="Click to copy full X-Bridge-Key">📋 Copy Key</button>
     </div>
@@ -333,6 +381,14 @@ const server = http.createServer((req, res) => {
       // Key is not exposed in HTML source for zero-trust security
       const stored = localStorage.getItem('switchboard_key');
       if (stored) key = stored;
+    }
+    if (key) {
+      const badge = document.getElementById('key-badge');
+      if (badge) {
+        badge.style.display = 'inline-block';
+        const prefixElem = document.getElementById('key-display-prefix');
+        if (prefixElem) prefixElem.textContent = key.slice(0, 8) + '...';
+      }
     }
 
     document.getElementById('copy-key-btn').addEventListener('click', () => {
@@ -873,7 +929,7 @@ const server = http.createServer((req, res) => {
           return;
         }
 
-        const destCheck = isProhibitedDestination(req, webhookUrl);
+        const destCheck = await isProhibitedDestinationAsync(req, webhookUrl);
         if (destCheck.prohibited) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: destCheck.reason }));
@@ -886,8 +942,8 @@ const server = http.createServer((req, res) => {
         if (!cfg.receipts) cfg.receipts = {};
 
         const existing = cfg.destinations[agentName] || {};
-        // Alias Hijack Defense: if destination already exists (Active or Disabled), require previousSecret or master key
-        if (existing && existing.signingSecret) {
+        // Alias Hijack Defense: if destination already exists (Active, Disabled, or Pending), require previousSecret or master key
+        if (existing && (existing.status || existing.signingSecret)) {
           const hasProof = payload.previousSecret && payload.previousSecret === existing.signingSecret;
           const hasMasterKey = req.headers['x-bridge-key'] === BRIDGE_KEY;
           if (!hasProof && !hasMasterKey) {
@@ -960,7 +1016,8 @@ const server = http.createServer((req, res) => {
               payloadMode,
               verifyEndpoint: 'https://switchboard.gisawareparth.workers.dev/api/webhook/verify',
               timestamp: Date.now()
-            })
+            }),
+            redirect: 'manual'
           });
 
           // Wait up to 3500ms for synchronous handshake_expression response
@@ -1177,7 +1234,7 @@ const server = http.createServer((req, res) => {
   if (req.method === 'POST' && url.pathname === '/api/webhook/rotate') {
     let body = '';
     req.on('data', chunk => { body += chunk; });
-    req.on('end', () => {
+    req.on('end', async () => {
       try {
         const payload = JSON.parse(body || '{}');
         const agentName = (payload.agent || '').trim().toLowerCase();
@@ -1189,7 +1246,7 @@ const server = http.createServer((req, res) => {
           return;
         }
 
-        const check = isProhibitedDestination(req, newUrl);
+        const check = await isProhibitedDestinationAsync(req, newUrl);
         if (check.prohibited) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: check.reason }));
@@ -1235,6 +1292,7 @@ const server = http.createServer((req, res) => {
         // Dispatch probe to new URL
         fetch(newUrl, {
           method: 'POST',
+          redirect: 'manual',
           headers: {
             'Content-Type': 'application/json',
             'User-Agent': 'The-Switchboard/2.6.15-verifier'
@@ -1245,7 +1303,8 @@ const server = http.createServer((req, res) => {
             challenge,
             verifyEndpoint: 'https://switchboard.gisawareparth.workers.dev/api/webhook/verify',
             timestamp: Date.now()
-          })
+          }),
+          redirect: 'manual'
         }).catch(err => {
           console.error(`[Verifier] Rotation probe error to ${agentName}: ${err.message}`);
         });
@@ -1376,13 +1435,15 @@ const server = http.createServer((req, res) => {
 
         const urlsToDispatch = new Map(); // url -> agentName
 
-        // Always notify Sol (coordinator) if not sent by Sol
-        if (fromStr !== 'sol' && cfg.sol_webhook_url) {
+        // Always notify Sol (coordinator) if not sent by Sol and Sol is Active
+        const destinations = cfg.destinations || {};
+        const solDest = destinations['sol'];
+        const isSolActive = !solDest || solDest.status === 'Active';
+        if (fromStr !== 'sol' && cfg.sol_webhook_url && isSolActive) {
           urlsToDispatch.set(cfg.sol_webhook_url, 'Sol');
         }
 
         // Check registered webhooks and destinations
-        const destinations = cfg.destinations || {};
         for (const [botName, botUrl] of Object.entries(registeredWebhooks)) {
           if (!botUrl) continue;
           const botLower = botName.toLowerCase();
@@ -1442,6 +1503,7 @@ const server = http.createServer((req, res) => {
 
           fetch(targetUrl, {
             method: 'POST',
+            redirect: 'manual',
             headers: dispatchHeaders,
             body: bodyStr
           })
