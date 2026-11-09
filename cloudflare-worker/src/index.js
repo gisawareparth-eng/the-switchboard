@@ -1,4 +1,4 @@
-const TARGET_ORIGIN = "https://asn-transaction-outlined-intersection.trycloudflare.com";
+const TARGET_ORIGIN = "https://deutsche-lighting-sapphire-standings.trycloudflare.com";
 
 export default {
   async fetch(request, env, ctx) {
